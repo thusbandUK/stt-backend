@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: Thoughtflow backend
+  version: 1.0.0
+  description: back end for the Thoughtflow journaling app
+paths:
+  /users:
+    summary: get users
+    description: list all users in the database
+    get:
+      summary: Returns users
+      description: Returns all non-encrypted details of all users in the database
+      operationId: /users      
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                users:
+                  value: >-
+                    {"orders":[{"username":"Hambone-Fakenamington","id":"1","email":"hambone@fakenamington.com",
+                    "password":"password"},{"username":"Darnarius-McQuimberton","id":"2","email":"darnarius@gmail.com",
+                    "password":"ShockingPasswordHygiene"},{"username":"Real-NotMadeUpPerson","id":"3","email":"notmadeup@hotmail.com",
+                    "password":"IWantHacking"}]}
+          description: 'success'
+      tags:
+        - users
+  /create-user:
+    summary: Create user
+    description: Add details of new user to database
+    post:
+      summary: Create user
+      description: >-
+        Enters the details of the new user into the database including encrypted
+        password
+      operationId: create-user
+      requestBody:
+        description: A new order object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          content:
+            application/json:
+              examples:
+                new user:
+                  value: >-
+                    {"new-user":[{"username":"Peregrine-Nonalias","id":"4","email":"peregrine@realperson.com",
+                    "password":"usersomesymbols!"}]}
+        default:
+          description: Default error sample response
+      tags:
+        - create-user
+  /update-user/{id}:
+    summary: Update user
+    description: Update details of the existing user with matching id in the database
+    put:
+      summary: Update user
+      description: Updates the details of the existing user with matching ID
+      operationId: update-user
+      parameters:
+        - name: id
+          in: path
+          description: 'The id of the order.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                updated user:
+                  value: >-
+                    {"updated-user":[{"username":"Peregrine-Nonalias","id":"4","email":"peregrine@gmail.com",
+                    "password":"usesomesymbols!"}]}
+        default:
+          description: Default error sample response
+      tags:
+        - update-user
+  /delete-user/{id}:
+    summary: Delete user
+    description: Delete the user account with matching id from the database
+    delete:
+      summary: Delete user
+      description: Deletes details from the database of the user with matching id
+      operationId: delete-user
+      parameters:
+        - name: id
+          in: path
+          description: 'The id of the order.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                user deleted:
+                  value: '{"deleted-user":[{"username":"Peregrine-Nonalias"}]}'
+        default:
+          description: Default error sample response
+      tags:
+        - delete-user
+        
+  components:
+  schemas:
+    User:
+      type: object
+      properties:
+        username:
+          type: string
+        id:
+          type: string
+        email:
+          type: string
+        password: 
+          type: string
+      xml:
+        name: User
