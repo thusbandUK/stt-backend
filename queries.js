@@ -1,3 +1,5 @@
+
+
 const Pool = require('pg').Pool
 const pool = new Pool({
   user: 'thoughtflowadmin',
@@ -28,9 +30,9 @@ const getUsers = (request, response) => {
   }
 
   const createUser = (request, response) => {
-    const { name, email } = request.body
+    const { username, email, password } = request.body
   
-    pool.query('INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *', [name, email], (error, results) => {
+    pool.query('INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *', [username, email, password], (error, results) => {
       if (error) {
         throw error
       }
@@ -72,3 +74,5 @@ const getUsers = (request, response) => {
     updateUser,
     deleteUser,
   }
+
+  
