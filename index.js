@@ -5,7 +5,15 @@ const port = 3000
 var path = require('path');
 const cookieParser = require("cookie-parser");
 const pg = require('pg');
+const dotenv = require('dotenv').config();
 
+/*accesses database login details from .env file via dbConfig.js to establish new client pool*/
+
+var dbAccess = require('./dbConfig');
+
+const Pool = require('pg').Pool
+const pgPool = new Pool(dbAccess);
+/*
 const pgPool = new pg.Pool({
   // Pool options:
   user: 'thoughtflowadmin',
@@ -14,7 +22,7 @@ const pgPool = new pg.Pool({
   password: 'p@ssword',
   port: 5432
 });
-
+*/
 
 const logger = require('morgan');
 const passport = require('passport');
