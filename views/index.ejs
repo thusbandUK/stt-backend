@@ -20,6 +20,33 @@
 					</li>
 				</ul>
 			</nav>
+
+			<!--Mock form logic-->
+
+		
+			<h1>Write your journal</h1>
+
+			    <!--error message logic-->
+                  <% if (hasMessages) { %>
+				    <section class="messages">
+					  <% messages.forEach(function(message) { %>
+					    <p><%= message %></p>
+					  <% }); %>
+				    </section>
+				  <% } %>
+			    <!--Error message logic ends-->
+
+              <form action="/save-journal" method="post">
+                <section>
+                  <label for="title">Enter title here</label>
+                  <input id="title" name="title" type="text" autocomplete="title" required autofocus>
+                </section>
+                <section>
+                  <label for="journalEntry">Enter thoughts here</label>
+                  <input id="journalEntry" name="journalEntry" type="journalEntry" autocomplete="current-password" required>
+                </section>
+                <button type="submit">Save thoughts</button>
+              </form>
 			
 		<footer class="info">
 			<p>Double-click to edit a todo</p>

@@ -3,9 +3,11 @@ var passport = require('passport');
 var LocalStrategy = require('passport-local');
 var crypto = require('crypto');
 var router = express.Router();
-
+var dbAccess = require('../dbConfig');
 
 const Pool = require('pg').Pool
+const pool = new Pool(dbAccess);
+/*
 const pool = new Pool({
   user: 'thoughtflowadmin',
   host: 'localhost',
@@ -13,7 +15,7 @@ const pool = new Pool({
   password: 'p@ssword',
   port: 5432,
 })
-
+*/
 
 //Passport authentication logic
 
@@ -22,7 +24,9 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
     pool.query('SELECT * FROM users WHERE username = $1', [ username ], function(error, results) {
       
     if (error) { return cb(error); }
-    if (!results.rows[0]) { return cb(null, false, { message: 'Incorrect username or password.' }); }
+    if (!results.rows[0]) { 
+      //console.log(cb(null, false, { message: 'Incorrect username or password.' }))
+      return cb(null, false, { message: 'Incorrect username or password.' }); }
 
     crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
       if (error) { return cb(error); }
@@ -55,6 +59,9 @@ router.get('/login', function(req, res, next) {
 router.post('/login/password', passport.authenticate('local', {
   successRedirect: '/',
   failureRedirect: '/login'
+  
+  ,
+  failureMessage: true
 }));
 
 router.post('/logout', function(req, res, next) {
