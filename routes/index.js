@@ -18,6 +18,33 @@ router.get('/', function(req, res, next) {
   res.render('index', { user: req.user });
 });
 
+/*Get journal by name */
+
+router.get('/journal-with-name', async function(req, res, next) {
+  const client = await pool.connect()
+
+  const userId = req.user.id;
+  const journalTitle = req.body.title;
+
+  const text = 'SELECT id FROM journal_references WHERE user_id = $1 AND journal_title = $2'
+  const values = [userId, journalTitle]
+
+   //executes query
+   try {
+
+    //makes async query
+    const dbResponse = await client.query(text, values);
+    //prunes the database metadata the user doesn't need
+    const journalId = dbResponse.rows[0];
+    //returns journal_reference.id
+    return res.status(200).json(journalId);
+            
+  } catch (err) {
+    //returns generic error message
+    res.status(404).json({message: 'No journal found by that title'})  
+  }  
+})
+
 /*Browse existing journal entries get request */
 
 router.get('/browse-journals', async function(req, res, next) {
