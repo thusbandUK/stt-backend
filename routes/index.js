@@ -20,50 +20,37 @@ router.get('/', function(req, res, next) {
 
 /*Post journal entry */
 
-//deleted ", ensureLoggedIn" from between "'/save-journal'," amd "function(req, res, next)"
-
-
-router.post('/save-journal', async function(req, res, next) {
+router.post('/create-journal', async function(req, res, next) {
   const client = await pool.connect()
-  console.log(req.body);
-  //res.send(req.body);
-  //return { message: `${req.body}`}
-  const userId = req.user.id;
+  
+  const userId = req.user.id;  
   const title = req.body.title;
-  const entry = req.body.journalEntry;
-  const numberOfPages = journalDivider.journalDivider(entry).length;
-  //const functionText = journalDivider.journalDivider.toString();
-  //const firstArray = journalDivider.journalDivider(entry[0]);
+  const url = req.body.url;
+  
 
-
-  const text = 'INSERT INTO journal_references(user_id, journal_title) VALUES($1, $2) RETURNING *'
-  const values = [userId, title]
+  const text = 'INSERT INTO journal_references(user_id, journal_title, cover_image) VALUES($1, $2, $3) RETURNING *'
+  const values = [userId, title, url]
 
   try {
-    const res = await client.query(text, values)
-    console.log(res.rows[0])
-    // { name: 'brianc', email: 'brian.m.carlson@gmail.com' }
+
+    const dbResponse = await client.query(text, values);
+    const {journal_title, cover_image} = dbResponse.rows[0];
+    return res.status(200).json({ message: `Journal saved with title: ${journal_title} and cover image link: ${cover_image}`});
+        
   } catch (err) {
-    console.log(err.stack)
-  }
 
-  //client.query
-
-  res.locals.messages = [`title entered: ${title}, journal entry: ${entry}, number of pages: ${numberOfPages}`];
-  res.locals.hasMessages = true;
-  //console.log(res.locals)
-  //res.redirect('/');
-  return res.render('index', { user: req.user });
-  client.release()
-  next();
-  //cb({ message: 'Incorrect username or password.' });
-  /*db.run('DELETE FROM todos WHERE owner_id = ? AND completed = ?', [
-    req.user.id,
-    1
-  ], function(err) {
-    if (err) { return next(err); }
-    return { message: 'let\'s see how this goes'};
-  });*/
+    //console.log(`This is the err.stack part: ${err.stack}`)
+    if (err.message.includes('unique')){
+      return res.status(500).json({message: 'You have already saved a journal with that title. Please choose a new title'});
+    } else if (err.message.includes('long')){
+      return res.status(500).json({message: 'Entry not saved. Please choose a title of 50 characters or fewer'});
+    } else {
+      return res.status(500).json({message: 'An unknown error prevented your journal from being saved.'})
+    }    
+  }  
+  
+  //client.release()
+    
 });
 
 
