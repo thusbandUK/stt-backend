@@ -111,6 +111,28 @@ connect.sid=I-am-a-cookie
 
 Now when you test the routes that require the user to be logged in, the request object will have a key **user.id** containing the database ID returned when the user first signed in.
 
+# Creating a journal
+
+(Note: as described in above section, the header will need to be configured with the session cookie details)
+
+request type: POST
+url / route: localhost:[PORT]/create-journal
+body: {"title": "[INSERT JOURNAL TITLE]", "url": "[INSERT URL FOR IMAGE]"}
+
+Note: The response to this request will contain a journalId, which needs to be incorporated into the request to save a journal, described in the next section.
+
+# Saving a journal entry
+
+(Note: as described in above section, the header will need to be configured with the session cookie details)
+
+request type: POST
+url / route: localhost:[PORT]/save-journal
+body: {"journalId": "[journalId*]", "title": "[INSERT TITLE]", "journalEntry": "[INSERT JOURNAL ENTRY]"}
+
+*The journalId will have been generated when the journal was created
+
+
+
 
 # voyage-tasks
 
