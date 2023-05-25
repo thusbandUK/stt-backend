@@ -75,7 +75,7 @@ router.get('/browse-journals', async function(req, res, next) {
 
 });
 
-/*Post journal entry */
+/*Create new journal */
 
 router.post('/create-journal', async function(req, res, next) {
   const client = await pool.connect()
@@ -113,56 +113,63 @@ router.post('/create-journal', async function(req, res, next) {
 /*Save a journal entry */
 
 router.post('/save-journal', async function(req, res, next) {
+  //generates client to connect to database
   const client = await pool.connect()
   
-  const userId = req.user.id;  
-  const title = req.body.title;
+  //harvests journal title and id from req.body object
+  const { title, journalId } = req.body;
+  
+  //transforms journal entry into an array of strings each of no more than 1000 characters in length
   const processedEntry = journalDivider.journalDivider(req.body.journalEntry);
+  //determines the number of sections in which the entry will be saved
   const numberOfSections = processedEntry.length;
-  let sectionNumber = 1;
+  
 
-  const text = 'INSERT INTO journal_sections(journal_reference_id, section_number) VALUES($1, $2) RETURNING *'
-  const values = [journalId, sectionNumber+1]
-
-  //const url = req.body.url;
-  //const numberOfPages = journalDivider.journalDivider(entry).length;
-  //const functionText = journalDivider.journalDivider.toString();
-  //const firstArray = journalDivider.journalDivider(entry[0]);
-
-
-  //const text = 'INSERT INTO journal_references(user_id, journal_title, cover_image) VALUES($1, $2, $3) RETURNING *'
-  //const values = [userId, title, url]
+  //defines database query for insertion into the journal_sections table
+  const journalSectionEntry = 'INSERT INTO journal_sections(journal_reference_id, section_number) VALUES($1, $2) RETURNING *'
+  //defines database query for insertion into the journal_content table
+  const journalContentEntry = 'INSERT INTO journal_content(journal_section_id, content) VALUES($1, $2) RETURNING *'
 
   try {
-    const res = await client.query(text, values)
-    console.log(res.rows[0])
-    // { name: 'brianc', email: 'brian.m.carlson@gmail.com' }
-  } catch (err) {
-    console.log(err.stack)
-  }
+    //initiates a transaction, so that if there is an error at any stage, the whole set of database changes will be rolled back
+    await client.query('BEGIN')
+   
+    //makes entries for each section of the entry into the journal_sections table; harvests the id for each section
+    let x;
+    let arrayOfSectionResponses = [];
+    for (x = 0; x<numberOfSections; x++){
+      const journalSectionValues = [journalId, x+1]
+      const dbResponse = await client.query(journalSectionEntry, journalSectionValues)
+      arrayOfSectionResponses.push(dbResponse.rows[0]);
+    }
 
-  //client.query
-  //res.locals.messages = [`title entered: ${title}, journal entry: ${entry}, number of pages: ${numberOfPages}`];
+    //makes entries for each section of the journal entry into the journal_content table, using the journal_section_id values from 
+    //code directly above
+    let y;
+    let arrayOfContentResponses = [];
+    for (y = 0; y<numberOfSections; y++){
+      const journalContentValues = [arrayOfSectionResponses[y].id, processedEntry[y]]
+      const dbResponse = await client.query(journalContentEntry, journalContentValues)
+      arrayOfContentResponses.push(dbResponse.rows[0]);
+    }
+    //Commits all the changes, provided no errors have occurred
+    await client.query('COMMIT')
 
-  res.locals.messages = [`title entered: ${title}, url: ${url}`];
-  res.locals.hasMessages = true;
-  //console.log(res.locals)
-  //res.redirect('/');
-  return res.status(200).json({ message: 'details saved' });
-  //.redirect('/')
-  //.redirect('/').json({ message: 'details saved' });
-  
-  //return res.render('index', { user: req.user });
-  client.release()
-  next();
-  //cb({ message: 'Incorrect username or password.' });
-  /*db.run('DELETE FROM todos WHERE owner_id = ? AND completed = ?', [
-    req.user.id,
-    1
-  ], function(err) {
-    if (err) { return next(err); }
-    return { message: 'let\'s see how this goes'};
-  });*/
+    //harvests data about the result of the database queries, which can be used to check the number of sections in which it was saved
+    //(ie of more use to developer than client)
+    finalisedNumberOfSections = arrayOfSectionResponses.pop();
+    finalisedContent = arrayOfContentResponses.pop();
+    
+    return res.status(200).json({ message: `Journal saved with ${finalisedNumberOfSections.section_number} sections and ${finalisedContent.id}`});
+  } catch (e) {
+    await client.query('ROLLBACK')
+    return res.status(500).json({message: `There was some kind of error`});
+    
+  } finally {
+    //releases client from pool
+    client.release()
+  }  
+
 });
 
 module.exports = router;

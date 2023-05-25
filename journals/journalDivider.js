@@ -2,6 +2,7 @@
 //This is important, it takes a string of any length as input and outputs an array of strings, each with a max length of 1000 characters
 
 module.exports.journalDivider = (stringToDivide) => {
+    console.log(typeof(stringToDivide));
     
     let arrayToReturn = [];
     let workingString;
