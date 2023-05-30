@@ -12,10 +12,16 @@ var journalDivider = require('../journals/journalDivider');
 
 
 router.get('/', function(req, res, next) {
-  if (!req.user) { return res.render('home'); }
-  console.log(req.user)
+  //THIS WAS HOW MOCK FRONT END HOME PAGE RENDERED
+  //if (!req.user) { return res.render('home'); }
+  
+  console.log(req.user);
+  if (!req.user) { return res.send('home page, not logged in'); }
+  //console.log(req.user)
   next();
-  res.render('index', { user: req.user });
+  //THIS WAS HOW MOCK FRONT END LOGGED IN INDEX PAGE RENDERED
+  //res.render('index', { user: req.user });
+  res.send('index page, logged in' , { user: req.user });
 });
 
 /*Get journal by name */
@@ -53,8 +59,9 @@ router.get('/browse-journals', async function(req, res, next) {
 
   //harvests userId from session data (via cookies)
   console.log(req.user);
-  const userId = req.user.id;
-  //const userId = 25;
+  
+  //const userId = req.user.id;
+  const userId = 23;
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
   const values = [userId]
