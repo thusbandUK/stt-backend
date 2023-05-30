@@ -76,6 +76,64 @@ Finally run the app with the following command:
 node index.js
 ~~~
 
+# using backend with a GUI, eg: Postman
+
+Having launched the app, the routes can be tested with a GUI. Postman is a good interface for this and the instructions below will
+assume that is the GUI in use. 
+
+**Signup**
+
+url / route: localhost:[PORT]/signup
+body: (use json format) {"username": "[INSERT USERNAME]", "password": "[INSERT PASSWORD]", "email": "[INSERT EMAIL"]}
+
+Note that having signed up, the app is configured to redirect the user to the login page, where they will then need to sign in, as follows:
+
+**signin**
+
+url / route: localhost:[PORT]/login/password
+body: {"username": "[INSERT USERNAME]", "password": "[INSERT PASSWORD]"}
+
+Note: the response will contain a cookie, which you should copy for use later.
+
+# Routes that require the user to be logged in
+
+The backend is configured to initiate a session so that having logged in, the user remains logged in. This is achieved by the creation 
+of a session cookie, mentioned in the **signin** section above.
+
+To test routes that require the user to be logged in, configure authorisation in your GUI. If using Postman, in the **Authorization** tab select **Api Key**. Make sure **Key** is set to **Cookie** then paste the cookie saved in the **signin** section above and paste it into the **Value** section, prepending it with: 
+~~~
+connect.sid=
+~~~
+So if the cookie text is: "I-am-a-cookie", you would paste into the **value** section:
+~~~
+connect.sid=I-am-a-cookie
+~~~
+
+Now when you test the routes that require the user to be logged in, the request object will have a key **user.id** containing the database ID returned when the user first signed in.
+
+# Creating a journal
+
+(Note: as described in above section, the header will need to be configured with the session cookie details)
+
+request type: POST
+url / route: localhost:[PORT]/create-journal
+body: {"title": "[INSERT JOURNAL TITLE]", "url": "[INSERT URL FOR IMAGE]"}
+
+Note: The response to this request will contain a journalId, which needs to be incorporated into the request to save a journal, described in the next section.
+
+# Saving a journal entry
+
+(Note: as described in above section, the header will need to be configured with the session cookie details)
+
+request type: POST
+url / route: localhost:[PORT]/save-journal
+body: {"journalId": "[journalId*]", "title": "[INSERT TITLE]", "journalEntry": "[INSERT JOURNAL ENTRY]"}
+
+*The journalId will have been generated when the journal was created
+
+
+
+
 # voyage-tasks
 
 Your project's `readme` is as important to success as your code. For 

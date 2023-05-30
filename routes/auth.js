@@ -20,6 +20,7 @@ const pool = new Pool({
 //Passport authentication logic
 
 passport.use(new LocalStrategy(function verify(username, password, cb) {
+  console.log(username);
   
     pool.query('SELECT * FROM users WHERE username = $1', [ username ], function(error, results) {
       
@@ -78,18 +79,19 @@ router.get('/signup', function(req, res, next) {
 /* Sign up user*/
 
 router.post('/signup', function(req, res, next){
-  const { username } = req.body
+  const { username, email } = req.body
   var salt = crypto.randomBytes(16);  
   crypto.pbkdf2(req.body.password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
     if (err){ return next(err); }
-    pool.query('INSERT INTO users (username, hashed_password, salt) VALUES ($1, $2, $3) RETURNING *', [username, hashedPassword, salt], 
+    pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
     (error, results) => {
       if (error) {
         throw error
       }
       var user = {
         id: this.lastID,
-        username: req.body.username
+        username: req.body.username,
+        email: email
       };
       /*SO THIS WOULD BE A GOOD THING TO RETURN TO, I DON'T GET HOW THERE COULD BE A REQ.LOGIN BECAUSE LOGIN ISN'T PART OF THE
       REQUEST BODY BUT WHO KNOWS, I'LL COME BACK TO THIS

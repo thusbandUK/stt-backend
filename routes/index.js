@@ -52,8 +52,9 @@ router.get('/browse-journals', async function(req, res, next) {
   const client = await pool.connect()
 
   //harvests userId from session data (via cookies)
+  console.log(req.user);
   const userId = req.user.id;
-  
+  //const userId = 25;
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
   const values = [userId]
