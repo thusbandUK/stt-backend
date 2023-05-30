@@ -31,8 +31,8 @@ router.get('/journal-with-name', async function(req, res, next) {
   const client = await pool.connect()
 
   const userId = req.user.id;
-  const journalTitle = req.body.title;
-  //console.log(req.query);
+  const journalTitle = req.query.title;
+  //console.log(req.query.title);
 
   const text = 'SELECT id FROM journal_references WHERE user_id = $1 AND journal_title = $2'
   const values = [userId, journalTitle]
