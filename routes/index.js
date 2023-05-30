@@ -61,8 +61,8 @@ router.get('/browse-journals', async function(req, res, next) {
   //harvests userId from session data (via cookies)
   console.log(req.user);
   
-  //const userId = req.user.id;
-  const userId = 23;
+  const userId = req.user.id;
+  //const userId = 23;
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
   const values = [userId]
