@@ -34,7 +34,8 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
 //Serialise user so they stay logged in during session
 
 passport.serializeUser(function(user, cb) {
-  //console.log(user);
+  console.log(user);
+  console.log('if you are seeing this there has been serialisation');
   process.nextTick(function() {
     cb(null, { id: user.id, username: user.username });
   });
@@ -79,7 +80,7 @@ router.get('/signup', function(req, res, next) {
 router.post('/signup', function(req, res, next){
   const { username, email } = req.body
   if (!email || !username || !req.body.password){
-    return res.status(500).send('You must enter a username, and password and email address to sign up');
+    return res.status(500).send('You must enter all fields to sign up');
   }
   var salt = crypto.randomBytes(16);  
   crypto.pbkdf2(req.body.password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
@@ -95,8 +96,8 @@ router.post('/signup', function(req, res, next){
       }
       var user = {
         //so here we have the user variable
-        id: results.rows[0].id,
-        //id: this.lastID,
+        //id: results.rows[0].id,
+        id: this.lastID,
         username: req.body.username,
         email: email
       };
@@ -107,8 +108,8 @@ router.post('/signup', function(req, res, next){
         if (err) { return next(err); }
         res.redirect('/');
       })      */
-      //res.redirect('/');
-      res.json(user);
+      res.redirect('/');
+      //res.json(user);
   })    
   
   })
