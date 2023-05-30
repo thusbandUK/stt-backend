@@ -32,6 +32,7 @@ router.get('/journal-with-name', async function(req, res, next) {
 
   const userId = req.user.id;
   const journalTitle = req.body.title;
+  //console.log(req.query);
 
   const text = 'SELECT id FROM journal_references WHERE user_id = $1 AND journal_title = $2'
   const values = [userId, journalTitle]
