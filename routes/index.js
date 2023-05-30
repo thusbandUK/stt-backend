@@ -21,7 +21,8 @@ router.get('/', function(req, res, next) {
   next();
   //THIS WAS HOW MOCK FRONT END LOGGED IN INDEX PAGE RENDERED
   //res.render('index', { user: req.user });
-  res.send('index page, logged in' , { user: req.user });
+  // , { user: req.user }
+  res.status(200).send('index page, logged in');
 });
 
 /*Get journal by name */

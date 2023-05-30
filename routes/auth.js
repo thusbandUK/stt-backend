@@ -34,7 +34,7 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
 //Serialise user so they stay logged in during session
 
 passport.serializeUser(function(user, cb) {
-  console.log(user);
+  //console.log(user);
   process.nextTick(function() {
     cb(null, { id: user.id, username: user.username });
   });
@@ -50,7 +50,7 @@ passport.deserializeUser(function(user, cb) {
 router.get('/login', function(req, res, next) {
   //res.render('login');
   res.send('this route to login');
-  //next();
+  next();
 });
 
 router.post('/login/password', passport.authenticate('local', {
@@ -78,12 +78,19 @@ router.get('/signup', function(req, res, next) {
 
 router.post('/signup', function(req, res, next){
   const { username, email } = req.body
+  if (!email || !username || !req.body.password){
+    return res.status(500).send('You must enter a username, and password and email address to sign up');
+  }
   var salt = crypto.randomBytes(16);  
   crypto.pbkdf2(req.body.password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
     if (err){ return next(err); }
     pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
     (error, results) => {
       if (error) {
+        if (error.constraint === "users_email_key"){
+          return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
+        }
+        //console.log(error.constraint);
         throw error
       }
       var user = {
@@ -100,7 +107,8 @@ router.post('/signup', function(req, res, next){
         if (err) { return next(err); }
         res.redirect('/');
       })      */
-      res.redirect('/');
+      //res.redirect('/');
+      res.json(user);
   })    
   
   })
