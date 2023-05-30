@@ -74,7 +74,7 @@ router.get('/browse-journals', async function(req, res, next) {
     //makes async query
     const dbResponse = await client.query(text, values);
     //prunes the database metadata the user doesn't need
-    const titlesAndImageUrls = dbResponse.rows.map(({id, user_id, ...rest}) => rest)
+    const titlesAndImageUrls = dbResponse.rows.map(({user_id, ...rest}) => rest)
     //returns success message and array of json objects of the requested data
     return res.status(200).json(titlesAndImageUrls);
             
