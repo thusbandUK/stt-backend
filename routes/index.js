@@ -4,24 +4,21 @@ var LocalStrategy = require('passport-local');
 var crypto = require('crypto');
 var router = express.Router();
 var dbAccess = require('../dbConfig');
-
+const session = require('express-session');
 const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
 
 var journalDivider = require('../journals/journalDivider');
 
 
+//sends a message depending on whether user is logged in or not
+
 router.get('/', function(req, res, next) {
-  //THIS WAS HOW MOCK FRONT END HOME PAGE RENDERED
-  //if (!req.user) { return res.render('home'); }
   
-  console.log(req.user);
   if (!req.user) { return res.send('home page, not logged in'); }
-  //console.log(req.user)
+  
   next();
-  //THIS WAS HOW MOCK FRONT END LOGGED IN INDEX PAGE RENDERED
-  //res.render('index', { user: req.user });
-  // , { user: req.user }
+  
   res.status(200).send('index page, logged in');
 });
 
@@ -32,24 +29,53 @@ router.get('/journal-with-name', async function(req, res, next) {
 
   const userId = req.user.id;
   const journalTitle = req.query.title;
-  //console.log(req.query.title);
+  
+  const journalReferenceQuery = 'SELECT * FROM journal_references WHERE user_id = $1 AND journal_title = $2'
+  const journalReferenceValues = [userId, journalTitle]
 
-  const text = 'SELECT id FROM journal_references WHERE user_id = $1 AND journal_title = $2'
-  const values = [userId, journalTitle]
+  const journalSectionsQuery = 'SELECT * FROM journal_sections WHERE journal_reference_id = $1'
 
-   //executes query
+  const journalContentQuery = 'SELECT * FROM journal_content WHERE journal_section_id = $1'
+
+   //executes set of queries
    try {
+    //begins database transaction
+    await client.query('BEGIN')
 
     //makes async query
-    const dbResponse = await client.query(text, values);
-    //prunes the database metadata the user doesn't need
-    const journalId = dbResponse.rows[0];
-    //returns journal_reference.id
-    return res.status(200).json(journalId);
+    const dbReferencesResponse = await client.query(journalReferenceQuery, journalReferenceValues);
+    //extracts details of journal reference
+    const journalReferenceDetails = dbReferencesResponse.rows[0];
+    //extracts journal_reference.id
+    const journalReferenceId = [journalReferenceDetails.id];
+    //makes async query to retrieve journal sections
+    const dbSectionsResponse = await client.query(journalSectionsQuery, journalReferenceId);
+    //adds array of section details to journalReferenceDetails
+    journalReferenceDetails.sections = dbSectionsResponse.rows;
+    
+    //Retrieves content for each section from database
+
+    let x;
+    let numberOfSections = journalReferenceDetails.sections.length;
+    for (x = 0; x < numberOfSections; x++){
+      const section_id = [journalReferenceDetails.sections[x].id];
+      const journalContentResponse = await client.query(journalContentQuery, section_id);
+      journalReferenceDetails.sections[x].contentDetails = journalContentResponse.rows[0];
+    }
+
+    //commits database changes, provided there have been no errors
+    await client.query('commit');
+
+    //returns status okay with all the details for that journal entry
+    return res.status(200).json(journalReferenceDetails);
+    
             
   } catch (err) {
     //returns generic error message
     res.status(404).json({message: 'No journal found by that title'})  
+  }  finally {
+    //releases client from pool
+    client.release()
   }  
 })
 
@@ -60,10 +86,9 @@ router.get('/browse-journals', async function(req, res, next) {
   const client = await pool.connect()
 
   //harvests userId from session data (via cookies)
-  console.log(req.user);
+    
+  const userId = req.user.id; 
   
-  const userId = req.user.id;
-  //const userId = 23;
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
   const values = [userId]

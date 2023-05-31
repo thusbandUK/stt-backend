@@ -12,13 +12,13 @@ const pool = new Pool(dbAccess);
 //Passport authentication logic
 
 passport.use(new LocalStrategy(function verify(username, password, cb) {
-  //console.log(username);
+  
   
     pool.query('SELECT * FROM users WHERE username = $1', [ username ], function(error, results) {
       
     if (error) { return cb(error); }
     if (!results.rows[0]) { 
-      //console.log(cb(null, false, { message: 'Incorrect username or password.' }))
+      
       return cb(null, false, { message: 'Incorrect username or password.' }); }
 
     crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
@@ -34,22 +34,19 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
 //Serialise user so they stay logged in during session
 
 passport.serializeUser(function(user, cb) {
-  console.log(user);
-  console.log('if you are seeing this there has been serialisation');
   process.nextTick(function() {
     cb(null, { id: user.id, username: user.username });
   });
 });
 
 passport.deserializeUser(function(user, cb) {
-  console.log('if you are seeing this there has been deserialisation');
   process.nextTick(function() {
     return cb(null, user);
   });
 });
 
 router.get('/login', function(req, res, next) {
-  //res.render('login');
+  
   res.send('this route to login');
   next();
 });
@@ -70,8 +67,7 @@ router.post('/logout', function(req, res, next) {
 });
 
 router.get('/signup', function(req, res, next) {
-  //THIS WAS HOW MOCK FRONT END RENDERED THE SIGNUP PAGE
-  //res.render('signup');
+  
   res.send('signup');
 });
 
@@ -91,12 +87,11 @@ router.post('/signup', function(req, res, next){
         if (error.constraint === "users_email_key"){
           return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
         }
-        //console.log(error.constraint);
+        
         throw error
       }
       var user = {
-        //so here we have the user variable
-        //id: results.rows[0].id,
+        
         id: this.lastID,
         username: req.body.username,
         email: email
@@ -108,8 +103,8 @@ router.post('/signup', function(req, res, next){
         if (err) { return next(err); }
         res.redirect('/');
       })      */
-      res.redirect('/');
-      //res.json(user);
+      //res.redirect('/');
+      res.json(user);
   })    
   
   })

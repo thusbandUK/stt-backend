@@ -68,6 +68,10 @@ app.use(session({
   cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 days
   // Insert express-session options here
 }));
+
+
+
+
 app.use(passport.authenticate('session'));
 
 /*I think this bit is for sending messages*/
