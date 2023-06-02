@@ -53,17 +53,21 @@ passport.deserializeUser(function(user, cb) {
   });
 });
 
-router.get('/login', function(req, res, next) {
-  res.render('login');
-});
+// NOTE: The frontend uses this route AND method to
+// login an existing user with their email and password
+router.post('/login', password.authenticate('local'));
 
-router.post('/login/password', passport.authenticate('local', {
-  successRedirect: '/',
-  failureRedirect: '/login'
+// router.get('/login', function(req, res, next) {
+//   res.render('login');
+// });
+
+// router.post('/login/password', passport.authenticate('local', {
+//   successRedirect: '/',
+//   failureRedirect: '/login'
   
-  ,
-  failureMessage: true
-}));
+//   ,
+//   failureMessage: true
+// }));
 
 router.post('/logout', function(req, res, next) {
   req.logout(function(err) {
