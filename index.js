@@ -4,7 +4,7 @@ const cors = require('cors');
 const app = express()
 const port = 3000
 var path = require('path');
-const cookieParser = require("cookie-parser");
+// const cookieParser = require("cookie-parser");
 const pg = require('pg');
 const dotenv = require('dotenv').config();
 
@@ -66,7 +66,9 @@ app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+// NOTE: cookie-parser middleware is no longer needed 
+// for express-session module to work as of version 1.5.0+
+// app.use(cookieParser('keyboard cat'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -82,7 +84,13 @@ app.use(session({
   cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 days
   // Insert express-session options here
 }));
-app.use(passport.authenticate('session'));
+
+
+
+app.use(passport.initialize());
+app.use(passport.session());
+// Need to be used within routes...
+// app.use(passport.authenticate('local'));
 
 /*I think this bit is for sending messages*/
 app.use(function(req, res, next) {
