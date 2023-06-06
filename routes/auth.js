@@ -59,6 +59,27 @@ router.post('/login/password', passport.authenticate('local', {
   failureMessage: true
 }));
 */
+
+router.post('/login', function(req, res, next) {
+  passport.authenticate('local', {successMessage: true, failureMessage: true}, function(err, user, info) {
+   
+    if (err) { return next(err) }
+    if (!user) { 
+     passport.authenticate('allFailed') 
+     return res.status(500).json(info)
+   
+   }
+   
+   //passport.authenticate.strategy.success();
+   req.logIn(user, function(err) {
+     if (err) { return next(err); }
+     return res.json(info);
+   })
+             
+  })(req, res, next);
+});
+
+
 router.post('/logout', function(req, res, next) {
   req.logout(function(err) {
     if (err) { return next(err); }
