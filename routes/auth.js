@@ -11,10 +11,9 @@ const pool = new Pool(dbAccess);
 
 //Passport authentication logic
 
-passport.use(new LocalStrategy(function verify(username, password, cb) {
+passport.use(new LocalStrategy(function verify(username, password, cb) {  
   
-  
-    pool.query('SELECT * FROM users WHERE username = $1', [ username ], function(error, results) {
+    pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
       
     if (error) { return cb(error); }
     if (!results.rows[0]) { 
@@ -24,8 +23,10 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
     crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
       if (error) { return cb(error); }
       if (!crypto.timingSafeEqual(results.rows[0].hashed_password, hashedPassword)) {
+        
         return cb(null, false, { message: 'Incorrect username or password.' });
       }
+      
       return cb(null, results.rows[0]);
     });
   });
@@ -44,21 +45,7 @@ passport.deserializeUser(function(user, cb) {
     return cb(null, user);
   });
 });
-/*
-router.get('/login', function(req, res, next) {
-  
-  res.send('this route to login');
-  next();
-});
 
-router.post('/login/password', passport.authenticate('local', {
-  successRedirect: '/',
-  failureRedirect: '/login'
-  
-  ,
-  failureMessage: true
-}));
-*/
 
 router.post('/login', function(req, res, next) {
   passport.authenticate('local', {successMessage: true, failureMessage: true}, function(err, user, info) {
@@ -73,7 +60,8 @@ router.post('/login', function(req, res, next) {
    //passport.authenticate.strategy.success();
    req.logIn(user, function(err) {
      if (err) { return next(err); }
-     return res.json(info);
+     const {id, email} = user;
+     return res.json({id, email});
    })
              
   })(req, res, next);
@@ -125,7 +113,11 @@ router.post('/signup', function(req, res, next){
         res.redirect('/');
       })      */
       //res.redirect('/');
-      res.json(user);
+      //res.json(user);
+      req.logIn(user, function(err) {
+        if (err) { return next(err); }
+        return res.json(user);
+      })
   })    
   
   })
