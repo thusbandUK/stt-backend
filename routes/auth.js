@@ -44,7 +44,7 @@ passport.deserializeUser(function(user, cb) {
     return cb(null, user);
   });
 });
-
+/*
 router.get('/login', function(req, res, next) {
   
   res.send('this route to login');
@@ -58,7 +58,7 @@ router.post('/login/password', passport.authenticate('local', {
   ,
   failureMessage: true
 }));
-
+*/
 router.post('/logout', function(req, res, next) {
   req.logout(function(err) {
     if (err) { return next(err); }
