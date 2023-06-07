@@ -11,23 +11,28 @@ const pool = new Pool(dbAccess);
 
 //Passport authentication logic
 
-passport.use(new LocalStrategy(function verify(username, password, cb) {  
+
+passport.use(new LocalStrategy(function verify(username, password, cb) {
+  
   
     pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
       
     if (error) { return cb(error); }
     if (!results.rows[0]) { 
-      
+
       return cb(null, false, { message: 'Incorrect username or password.' }); }
 
     crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
-      if (error) { return cb(error); }
+      
+      if (err) { return cb(err); }
       if (!crypto.timingSafeEqual(results.rows[0].hashed_password, hashedPassword)) {
         
         return cb(null, false, { message: 'Incorrect username or password.' });
       }
+
       
       return cb(null, results.rows[0]);
+
     });
   });
 }));
@@ -45,6 +50,7 @@ passport.deserializeUser(function(user, cb) {
     return cb(null, user);
   });
 });
+
 
 
 router.post('/login', function(req, res, next) {
@@ -68,6 +74,7 @@ router.post('/login', function(req, res, next) {
 });
 
 
+
 router.post('/logout', function(req, res, next) {
   req.logout(function(err) {
     if (err) { return next(err); }
@@ -75,10 +82,6 @@ router.post('/logout', function(req, res, next) {
   });
 });
 
-router.get('/signup', function(req, res, next) {
-  
-  res.send('signup');
-});
 
 /* Sign up user*/
 
@@ -93,6 +96,7 @@ router.post('/signup', function(req, res, next){
     pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
     (error, results) => {
       if (error) {
+
         if (error.constraint === "users_email_key"){
           return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
         }
@@ -105,19 +109,17 @@ router.post('/signup', function(req, res, next){
         username: req.body.username,
         email: email
       };
-      //console.log(user.id)
-      /*SO THIS WOULD BE A GOOD THING TO RETURN TO, I DON'T GET HOW THERE COULD BE A REQ.LOGIN BECAUSE LOGIN ISN'T PART OF THE
-      REQUEST BODY BUT WHO KNOWS, I'LL COME BACK TO THIS
-      req.login(user, function(err) {
-        if (err) { return next(err); }
-        res.redirect('/');
-      })      */
-      //res.redirect('/');
-      //res.json(user);
+           
+
+      
       req.logIn(user, function(err) {
         if (err) { return next(err); }
         return res.json(user);
       })
+
+          
+      res.status(200).end();
+
   })    
   
   })

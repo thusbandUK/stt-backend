@@ -1,10 +1,11 @@
 const express = require('express')
-const bodyParser = require('body-parser')
+// const bodyParser = require('body-parser')
+const cors = require('cors');
 const app = express()
 const port = 3000
 const cors = require('cors');
 var path = require('path');
-const cookieParser = require("cookie-parser");
+// const cookieParser = require("cookie-parser");
 const pg = require('pg');
 const dotenv = require('dotenv').config();
 
@@ -50,12 +51,25 @@ const authRouter = require('./routes/auth');
 //assign public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(bodyParser.json())
+// Similar middlewares are used in lines 67-68
+// app.use(bodyParser.json())
+// app.use(
+//   bodyParser.urlencoded({
+//     extended: true,
+//   })
+// )
+
+// Allow CORS for known origins
 app.use(
-  bodyParser.urlencoded({
-    extended: true,
-  })
-)
+  cors({
+    origin:
+      process.env.NODE_ENV === 'development'
+        ? process.env.DEV_ORIGIN
+        : process.env.PROD_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  }),
+);
 
 // Temporary ejs code enables mock front-end for development purposes
 app.set('views', path.join(__dirname, 'views'));
@@ -65,7 +79,9 @@ app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+// NOTE: cookie-parser middleware is no longer needed 
+// for express-session module to work as of version 1.5.0+
+// app.use(cookieParser('keyboard cat'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -85,7 +101,15 @@ app.use(session({
 
 
 
+
+
+
+app.use(passport.initialize());
+app.use(passport.session());
 app.use(passport.authenticate('session'));
+// Need to be used within routes...
+// app.use(passport.authenticate('local'));
+
 
 /*I think this bit is for sending messages*/
 app.use(function(req, res, next) {
