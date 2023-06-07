@@ -3,6 +3,7 @@ const express = require('express')
 const cors = require('cors');
 const app = express()
 const port = 3000
+const cors = require('cors');
 var path = require('path');
 // const cookieParser = require("cookie-parser");
 const pg = require('pg');
@@ -24,6 +25,18 @@ const pgPool = new pg.Pool({
   port: 5432
 });
 */
+
+// Allow CORS for known origins
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV === 'development'
+        ? process.env.DEV_ORIGIN
+        : process.env.PROD_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  }),
+);
 
 const logger = require('morgan');
 const passport = require('passport');
@@ -87,10 +100,16 @@ app.use(session({
 
 
 
+
+
+
+
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(passport.authenticate('session'));
 // Need to be used within routes...
 // app.use(passport.authenticate('local'));
+
 
 /*I think this bit is for sending messages*/
 app.use(function(req, res, next) {
