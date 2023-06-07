@@ -82,15 +82,13 @@ router.get('/journal-with-name', async function(req, res, next) {
 /*Browse existing journal entries get request */
 
 router.get('/browse-journals', async function(req, res, next) {
-  //console.log('browse journals called')
-  //configures client to connect to database
+    
   const client = await pool.connect()
 
+  
   //harvests userId from session data (via cookies)
-
     
   const userId = req.user.id; 
-  
 
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
@@ -111,9 +109,12 @@ router.get('/browse-journals', async function(req, res, next) {
     return res.status(200).json(titlesAndImageUrls);
   } catch (err) {
     //returns generic error message
+    
     res.status(404).json({message: 'No journal entries found'})  
+  }  finally {
+    //releases client from pool
+    client.release()
   }  
-
 });
 
 /*Create new journal */
