@@ -214,6 +214,19 @@ router.post('/save-journal', async function(req, res, next) {
 
 });
 
+/*
+put request expects req.body with following format:
+
+ {"section": 
+        {
+            "contentDetails": {
+                "id": X,
+                "content": "CONTENT"
+            }
+        }
+      }
+*/
+
 router.put('/edit-section', async function(req, res, next){
   //initiates connection to database
   const client = await pool.connect()
