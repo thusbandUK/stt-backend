@@ -213,43 +213,74 @@ router.post('/save-journal', async function(req, res, next) {
 
 });
 
-/* DELETE BELOW PUT PATH */
+/*
 
-router.put('/edit-journal-reference', async function(req, res, next){
-  
+put request expects req.body with following format:
 
+ {"section": 
+        {
+            
+            "journal_reference_id": XX, 
+            "section_number": XX,
+            "contentDetails": {
+                "content": "CONTENT" 
+            }
+        }
+      }
+*/
+
+router.put('/save-section', async function(req, res, next){
   //initiates connection to database
   const client = await pool.connect()
 
   //parses data from request body
-  const {id, title, url} = req.body;
+  const referenceId = req.body.section.journal_reference_id;
+  const content = req.body.section.contentDetails.content;
+  const sectionNumber = req.body.section.section_number;
 
-  //database query and values
-  const databaseQuery = 'UPDATE journal_references SET journal_title = $1, cover_image = $2 WHERE id = $3 RETURNING *'
+  //database query for journal_sections
+  const databaseSectionsQuery = 'INSERT INTO journal_sections (journal_reference_id, section_number) VALUES ($1, $2) RETURNING *'
   
-  const values = [title, url, id];
+  const sectionValues = [referenceId, sectionNumber];
+
+  //database query for journal_content
+  const databaseContentQuery = 'INSERT INTO journal_content (journal_section_id, content) VALUES ($1, $2) RETURNING *'
+
+  let responseObject = {sections: {}}
 
   try {
     //initiates database query
     await client.query('BEGIN')
-    const databaseResponse = await client.query(databaseQuery, values);
+    const databaseSectionsResponse = await client.query(databaseSectionsQuery, sectionValues);
     
-    //parses values from query response
-    const {journal_title, cover_image} = databaseResponse.rows[0];
+    //adds journal_section details to json response object
+    responseObject.sections = databaseSectionsResponse.rows[0];
+
+    //parses value from query response
+    const journalSectionId = databaseSectionsResponse.rows[0].id;
+
+    //assigns values for database query
+    const contentValues = [journalSectionId, content]
+    
+    //adds content to journal_content
+    const databaseContentResponse = await client.query(databaseContentQuery, contentValues);
+
+    //adds journal_content details to json response object
+    responseObject.sections.contentDetails = databaseContentResponse.rows[0];
 
     //commits changes
     await client.query('COMMIT')
 
     //sends response with updated details
-    return res.status(200).json({ message: `Edited journal updated with title: ${journal_title} and cover image link: ${cover_image}`});
+    return res.status(200).json({ message: `Section saved.`, responseObject});
         
   } catch (e) {
     //reverses all changes if error arises
     await client.query('ROLLBACK')
-    
-    //returns specific error message if user tries to save two journal entries with same title
-    if (e.stack.includes('unique')){
-      return res.status(500).json({message: `Cannot save two journal entries with the same title`});  
+        
+    //returns specific error message if user tries to save content exceeding 1000 characters
+    if (e.stack.includes('value too long')){
+      return res.status(500).json({message: `Too long! Content 1000 characters max pls =)`});  
     }
     return res.status(500).json({message: `There was some kind of error`});
     
@@ -257,9 +288,9 @@ router.put('/edit-journal-reference', async function(req, res, next){
     //releases client from pool
     client.release()
   } 
+  
+  
+})
 
-});
-
-/* DELETE ABOVE PUT PATH */
 
 module.exports = router;
