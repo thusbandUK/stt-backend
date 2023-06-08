@@ -214,4 +214,9 @@ router.post('/save-journal', async function(req, res, next) {
 
 });
 
+router.put('/edit-section', function(req, res, next){
+  
+})
+
+
 module.exports = router;
