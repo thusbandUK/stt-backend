@@ -229,7 +229,7 @@ put request expects req.body with following format:
       }
 */
 
-router.put('/save-section', async function(req, res, next){
+router.post('/save-section', async function(req, res, next){
   //initiates connection to database
   const client = await pool.connect()
 
