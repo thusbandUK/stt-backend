@@ -272,7 +272,7 @@ router.post('/save-section', async function(req, res, next){
     await client.query('COMMIT')
 
     //sends response with updated details
-    return res.status(200).json({ message: `Section saved.`, responseObject});
+    return res.status(200).json({ message: `Section saved.`});
         
   } catch (e) {
     //reverses all changes if error arises
