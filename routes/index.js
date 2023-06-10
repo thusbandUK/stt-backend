@@ -232,8 +232,7 @@ router.put('/edit-section', async function(req, res, next){
   const client = await pool.connect()
 
   //parses data from request body
-  const id = req.body.section.contentDetails.id;
-  const content = req.body.section.contentDetails.content;
+  const { id, content } = req.body;
 
   //database query and values
   const databaseQuery = 'UPDATE journal_content SET content = $1 WHERE id = $2 RETURNING *'
