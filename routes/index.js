@@ -84,7 +84,6 @@ router.get('/journal-with-name', async function(req, res, next) {
 router.get('/browse-journals', async function(req, res, next) {
     
   const client = await pool.connect()
-
   
   //harvests userId from session data (via cookies)
     
@@ -213,6 +212,75 @@ router.post('/save-journal', async function(req, res, next) {
   }  
 
 });
+
+/*
+
+put request expects req.body with following format:
+
+ {"section": 
+        {
+            
+            "journal_reference_id": XX, 
+            "section_number": XX,
+            "contentDetails": {
+                "content": "CONTENT" 
+            }
+        }
+      }
+*/
+
+router.post('/save-section', async function(req, res, next){
+  //initiates connection to database
+  const client = await pool.connect()
+
+  //parses data from request body
+  const { referenceId, content, sectionNumber } = req.body;
+
+  //database query for journal_sections
+  const databaseSectionsQuery = 'INSERT INTO journal_sections (journal_reference_id, section_number) VALUES ($1, $2) RETURNING *'
+  
+  const sectionValues = [referenceId, sectionNumber];
+
+  //database query for journal_content
+  const databaseContentQuery = 'INSERT INTO journal_content (journal_section_id, content) VALUES ($1, $2) RETURNING *'
+
+  try {
+    //initiates database query
+    await client.query('BEGIN')
+    const databaseSectionsResponse = await client.query(databaseSectionsQuery, sectionValues);
+
+    //parses value from query response
+    const journalSectionId = databaseSectionsResponse.rows[0].id;
+
+    //assigns values for database query
+    const contentValues = [journalSectionId, content]
+    
+    //adds content to journal_content
+    await client.query(databaseContentQuery, contentValues);
+
+    //commits changes
+    await client.query('COMMIT')
+
+    //sends response with updated details
+    return res.status(200).json({ message: `Section saved.`});
+        
+  } catch (e) {
+    //reverses all changes if error arises
+    await client.query('ROLLBACK')
+        
+    //returns specific error message if user tries to save content exceeding 1000 characters
+    if (e.stack.includes('value too long')){
+      return res.status(500).json({message: `Too long! Content 1000 characters max pls =)`});  
+    }
+    return res.status(500).json({message: `There was some kind of error`});
+    
+  } finally {
+    //releases client from pool
+    client.release()
+  } 
+  
+  
+})
 
 /*
 put request expects req.body with following format:
