@@ -234,9 +234,7 @@ router.post('/save-section', async function(req, res, next){
   const client = await pool.connect()
 
   //parses data from request body
-  const referenceId = req.body.section.journal_reference_id;
-  const content = req.body.section.contentDetails.content;
-  const sectionNumber = req.body.section.section_number;
+  const { referenceId, content, sectionNumber } = req.body;
 
   //database query for journal_sections
   const databaseSectionsQuery = 'INSERT INTO journal_sections (journal_reference_id, section_number) VALUES ($1, $2) RETURNING *'
@@ -246,15 +244,10 @@ router.post('/save-section', async function(req, res, next){
   //database query for journal_content
   const databaseContentQuery = 'INSERT INTO journal_content (journal_section_id, content) VALUES ($1, $2) RETURNING *'
 
-  let responseObject = {sections: {}}
-
   try {
     //initiates database query
     await client.query('BEGIN')
     const databaseSectionsResponse = await client.query(databaseSectionsQuery, sectionValues);
-    
-    //adds journal_section details to json response object
-    responseObject.sections = databaseSectionsResponse.rows[0];
 
     //parses value from query response
     const journalSectionId = databaseSectionsResponse.rows[0].id;
@@ -263,10 +256,7 @@ router.post('/save-section', async function(req, res, next){
     const contentValues = [journalSectionId, content]
     
     //adds content to journal_content
-    const databaseContentResponse = await client.query(databaseContentQuery, contentValues);
-
-    //adds journal_content details to json response object
-    responseObject.sections.contentDetails = databaseContentResponse.rows[0];
+    await client.query(databaseContentQuery, contentValues);
 
     //commits changes
     await client.query('COMMIT')
