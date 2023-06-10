@@ -82,15 +82,13 @@ router.get('/journal-with-name', async function(req, res, next) {
 /*Browse existing journal entries get request */
 
 router.get('/browse-journals', async function(req, res, next) {
-  //console.log('browse journals called')
-  //configures client to connect to database
+    
   const client = await pool.connect()
 
+  
   //harvests userId from session data (via cookies)
-
     
   const userId = req.user.id; 
-  
 
   //configures database query / parameters
   const text = 'SELECT * FROM journal_references WHERE user_id = $1'
@@ -111,9 +109,12 @@ router.get('/browse-journals', async function(req, res, next) {
     return res.status(200).json(titlesAndImageUrls);
   } catch (err) {
     //returns generic error message
+    
     res.status(404).json({message: 'No journal entries found'})  
+  }  finally {
+    //releases client from pool
+    client.release()
   }  
-
 });
 
 /*Create new journal */
@@ -212,5 +213,64 @@ router.post('/save-journal', async function(req, res, next) {
   }  
 
 });
+
+/*
+put request expects req.body with following format:
+
+ {"section": 
+        {
+            "contentDetails": {
+                "id": X,
+                "content": "CONTENT"
+            }
+        }
+      }
+*/
+
+router.put('/edit-section', async function(req, res, next){
+  //initiates connection to database
+  const client = await pool.connect()
+
+  //parses data from request body
+  const { id, content } = req.body;
+
+  //database query and values
+  const databaseQuery = 'UPDATE journal_content SET content = $1 WHERE id = $2 RETURNING *'
+  
+  const values = [content, id];
+
+  try {
+    //initiates database query
+    await client.query('BEGIN')
+    const databaseResponse = await client.query(databaseQuery, values);
+    
+    //parses values from query response
+    //const {journal_title, cover_image} = databaseResponse.rows[0];
+
+    //commits changes
+    await client.query('COMMIT')
+
+    //sends response with updated details
+    return res.status(200).json({ message: `Section content updated.`, entry: databaseResponse.rows[0]});
+        
+  } catch (e) {
+    //reverses all changes if error arises
+    await client.query('ROLLBACK')
+    //console.log(e.stack);
+    
+    //returns specific error message if user tries to save two journal entries with same title
+    if (e.stack.includes('value too long')){
+      return res.status(500).json({message: `Too long! Content 1000 characters max pls =)`});  
+    }
+    return res.status(500).json({message: `There was some kind of error`});
+    
+  } finally {
+    //releases client from pool
+    client.release()
+  } 
+  
+  
+})
+
 
 module.exports = router;

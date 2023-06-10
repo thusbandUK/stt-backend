@@ -13,7 +13,7 @@ const pool = new Pool(dbAccess);
 
 
 passport.use(new LocalStrategy(function verify(username, password, cb) {
-  
+    
   
     pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
       
@@ -40,12 +40,14 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
 //Serialise user so they stay logged in during session
 
 passport.serializeUser(function(user, cb) {
+  
   process.nextTick(function() {
     cb(null, { id: user.id, username: user.username });
   });
 });
 
 passport.deserializeUser(function(user, cb) {
+  
   process.nextTick(function() {
     return cb(null, user);
   });
@@ -54,6 +56,7 @@ passport.deserializeUser(function(user, cb) {
 
 
 router.post('/login', function(req, res, next) {
+  
   passport.authenticate('local', {successMessage: true, failureMessage: true}, function(err, user, info) {
    
     if (err) { return next(err) }
