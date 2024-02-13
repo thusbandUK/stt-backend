@@ -11,6 +11,52 @@ const pool = new Pool(dbAccess);
 var journalDivider = require('../journals/journalDivider');
 
 
+
+router.get('/welcome', async function(req,res,next) {
+console.log('welcome get request called at back end');
+if (!req.user){
+  //console.log(req);
+  //console.log(req.sessionID);
+  //console.log('there weren\'t no req.user');
+  return res.status(404).json('no user logged in');
+}
+console.log(req.user);
+//console.log(req.user);
+  const client = await pool.connect()
+
+  const userId = req.user.id;
+  //console.log(userId);
+  const detailsQuery = 'SELECT * FROM details2 WHERE user_id = $1'
+  const detailsReferences = [userId]
+
+  try {
+    
+    await client.query('BEGIN');
+    
+    const dbResponse = await client.query(detailsQuery, detailsReferences);
+    //console.log(dbResponse);
+    const detailsValues = dbResponse.rows[0];
+    //console.log(detailsValues);
+
+    //commits database changes, provided there have been no errors
+    await client.query('commit');
+
+    //returns status okay with all the details for that journal entry
+    return res.status(200).json(detailsValues);    
+    
+  } catch (err) {
+    //returns generic error message
+    //console.log(err);
+    res.status(404).json({message: 'No details found'})  
+  }  finally {
+    //releases client from pool
+    client.release()
+  }  
+
+})
+
+/*All the below are from the Thoughtflow app */
+
 //sends a message depending on whether user is logged in or not
 
 router.get('/', function(req, res, next) {

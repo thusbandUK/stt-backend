@@ -35,6 +35,7 @@ app.use(
         ? process.env.DEV_ORIGIN
         : process.env.PROD_ORIGIN,
     credentials: true,
+    //httponly: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   }),
 );
@@ -61,7 +62,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // )
 
 // Allow CORS for known origins
-app.use(
+/*
   cors({
     origin:
       process.env.NODE_ENV === 'development'
@@ -71,7 +72,7 @@ app.use(
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   }),
 );
-
+*/
 // Temporary ejs code enables mock front-end for development purposes
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -92,6 +93,7 @@ app.use(session({
     tableName : "session"
   }),
   secret: 'keyboard cat',
+  //httpOnly: false,
   saveUninitialized: true,
   //secret: process.env.FOO_COOKIE_SECRET,
   resave: false,
@@ -104,8 +106,9 @@ app.use(session({
 
 
 
-
+console.log('passport initialize should run next?');
 app.use(passport.initialize());
+console.log('passport session should run next?');
 app.use(passport.session());
 app.use(passport.authenticate('session'));
 // Need to be used within routes...
@@ -115,7 +118,7 @@ app.use(passport.authenticate('session'));
 /*I think this bit is for sending messages*/
 app.use(function(req, res, next) {
   //console.log('anonymous message function called');
-  var msgs = req.session.messages || [];
+  var msgs = req.session.messages || [];  
   res.locals.messages = msgs;
   res.locals.hasMessages = !! msgs.length;
   req.session.messages = [];
