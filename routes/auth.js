@@ -142,22 +142,27 @@ router.post('/signup', function(req, res, next){
   //console.log('hello and username is...');
   //console.log(req.body);
   if (!email || !username || !req.body.password){
-    return res.status(500).send('You must enter all fields to sign up');
+    return res.status(500).json({message: 'You must enter all fields to sign up'});
   }
   var salt = crypto.randomBytes(16);  
   crypto.pbkdf2(req.body.password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
-    if (err){ return next(err); }
+    if (err){ 
+      //console.log(err);      
+      return next(err); 
+    }
     pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
     (error, results) => {
       if (error) {
         //console.log('if error called');
 
         if (error.constraint === "users_email_key"){
-          console.log('users email key called');
-          return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
+          //console.log('users email key called');
+          //return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
+          return res.status(500).json({message: "A user with that email already exists. Please sign up with a different email address"});
         }
-        //console.log(error);
-        throw error
+        //console.log(error.constraint);
+        //throw error
+        return res.status(500).json({message: "unspecified server error"})
       }
       var user = {
         
@@ -167,15 +172,15 @@ router.post('/signup', function(req, res, next){
       };
            
 
-      /**/
+      /* SO THIS WAS HOW THE USER WAS AUTOMATICALLY LOGGED IN FROM THE BEFORE TIMES
       req.logIn(user, function(err) {
         if (err) { return next(err); }
         return res.json(user);
       })
+      */
       
-          /*So this is the culprit, it tries to send another header once the above has already set it. the above was the code
-          that automatically logged in the user once they were signed up */
-      //res.status(200).json(user);
+          /*PREVIOUSLY THIS WAS HOW IT WORKED AND NOW RESTORED,  */
+      res.status(200).json(user);
 
   })    
   
