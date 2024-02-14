@@ -1,6 +1,11 @@
 --This part creates a table for login detals
 
-CREATE TABLE users (id SERIAL,username varchar(40),email varchar(50) UNIQUE,hashed_password bytea,salt bytea,PRIMARY KEY (id));
+-- SUPERCEDED AS NEEDED ACTIVE COLUMN
+-- CREATE TABLE users (id SERIAL,username varchar(40),email varchar(50) UNIQUE,hashed_password bytea,salt bytea,PRIMARY KEY (id));
+
+--THIS IS THE NEW VERSION, CODE NOT TESTED
+CREATE TABLE users (id SERIAL,username varchar(40),email varchar(50) UNIQUE,hashed_password bytea,salt bytea, active boolean DEFAULT false, PRIMARY KEY (id));
+
 
 --This part creates a session table
 
