@@ -14,7 +14,7 @@ const pool = new Pool(dbAccess);
 
 
 passport.use(new LocalStrategy(function verify(username, password, cb) {
-  console.log(username+password);
+  //console.log(username+password);
     
   
     pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
@@ -134,6 +134,80 @@ router.post('/logout', function(req, res, next) {
   });
 });
 */
+/*Email verification function */
+
+/*
+so what needs to happen is:
+in the signing up logic
+1) the password needs to be hashed and stored with its salt
+2) a 128 string needs to be generated, hashed and stored in the database with its salt and then its string sent in an email
+with the id number of the database row where it's stored
+3) separate functions - 
+a) sendEmail, with plenty o' parameters
+b) generateEmailToken generate random 16-byte salt and random 128-byte buffer / string
+4) back in sign up you call generateEmailToken, then store the (hashed) information to the database and then send the email
+
+
+
+*/
+
+
+router.get('/verifyEmail', async function(req,res,next){
+
+  var salt = crypto.randomBytes(16);
+      console.log('here is salt');
+      console.log(salt)
+      var token = crypto.randomBytes(128);
+      console.log('here is token');
+      console.log(token);
+      console.log('and now let\'s try token to string');
+      console.log(token.toString('hex'));
+      console.log('and now let\'s try turning it back into a buffer');
+
+      const chunk = Buffer.from(token, 'hex');
+      console.log(chunk);
+
+      
+
+      try {
+        /*
+        crypto.randomBytes(256, (err, buf) => {
+          if (err) throw err;
+          token = buf.toString('hex');
+          //console.log(token);
+          
+          res.status(200).json({token: token});
+          //console.log(`${buf.length} bytes of random data: ${buf.toString('hex')}`);
+        })*/
+        //console.log(stringGeneration);
+        crypto.pbkdf2(token, salt, 100000, 64, 
+         'sha512', (err, derivedKey) => { 
+  
+           if (err) throw err; 
+  
+           // Prints derivedKey 
+           console.log(derivedKey.toString('hex')); 
+           res.status(200).json({derivedKey: derivedKey.toString('hex')});
+        }); 
+
+        
+
+      } catch (error){
+
+        res.status(500).json({message: 'internal server error'});
+      }
+     
+
+   
+
+})
+
+function verifyEmail() {
+return 'hello'      ;
+     
+}
+
+
 
 /* Sign up user*/
 
@@ -164,12 +238,16 @@ router.post('/signup', function(req, res, next){
         //throw error
         return res.status(500).json({message: "unspecified server error"})
       }
+      //const {token, salt} = verifyEmail();
       var user = {
         
         id: this.lastID,
         username: req.body.username,
-        email: email
+        email: email,
+        token: token,
+        
       };
+      
            
 
       /* SO THIS WAS HOW THE USER WAS AUTOMATICALLY LOGGED IN FROM THE BEFORE TIMES
