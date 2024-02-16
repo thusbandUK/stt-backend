@@ -4,6 +4,7 @@ var LocalStrategy = require('passport-local');
 var crypto = require('crypto');
 var router = express.Router();
 var dbAccess = require('../dbConfig');
+const { mailOptions, transporter, generateEmailToken, verificationEmail } = require('../email');
 //var session = require('express-session')
 
 const Pool = require('pg').Pool
@@ -202,10 +203,7 @@ router.get('/verifyEmail', async function(req,res,next){
 
 })
 
-function verifyEmail() {
-return 'hello'      ;
-     
-}
+
 
 
 
@@ -269,13 +267,63 @@ router.post('/signup', function(req, res, next){
   })
 })
 
-const middlewareExperiment = function (req, res, next) {
-  console.log('middleware triggered');
+const middlewareExperiment = async function (req, res, next) {
+  const { username, email } = req.body;
+  const client = await pool.connect();
+  const detailsQuery = 'SELECT id, active FROM users WHERE email = $1';
+  const detailsReferences = [email];
+  const date = new Date();
+  
+
+  try {
+    const { verificationToken, verificationSalt } = generateEmailToken();
+    const stringToken = verificationToken.toString('hex');
+    await client.query('BEGIN');
+    //queries database for id number
+    const dbResponse = await client.query(detailsQuery, detailsReferences);
+
+    const activeAndID = dbResponse.rows[0];
+    if (activeAndID.active === true){
+      return res.status(404).json({message: 'something went wrong, please contact administrator'});
+    }
+    crypto.pbkdf2(verificationToken, verificationSalt, 310000, 32, 'sha256', function(err, hashedToken){    
+      if (err){ 
+        //console.log(err);      
+        return next(err); 
+      }
+      client.query('INSERT INTO verification (hashed_string, date_stored, user_id, salt) VALUES ($1, $2, $3, $4) RETURNING *', [hashedToken, date, activeAndID.id, verificationSalt], 
+        (error, results) => {
+        if (error) {
+          //error handling
+          console.log(error);
+          return next(err);
+        }
+        const { id } = results.rows[0];        
+        
+        //Sends the email with the link
+        const emailResponse = verificationEmail(email, stringToken, id)
+        return res.status(200).json({message: 'Verification email sent'});
+      })
+    })
+
+    //commits database changes, provided there have been no errors
+    await client.query('commit');
+
+
+  } catch (error){
+    await client.query('ROLLBACK')
+
+    res.status(404).json({message: 'Something went wrong'})
+  } finally {
+    client.release()
+
+  }
+  /*console.log('middleware triggered');
   if (req){
   const user = req.user;
   console.log(user);
   res.status(200).json(user);}
-  next();
+  next();*/
 
 }
 
