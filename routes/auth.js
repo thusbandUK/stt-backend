@@ -239,15 +239,17 @@ router.post('/signup', function(req, res, next){
         return res.status(500).json({message: "unspecified server error"})
       }
       //const {token, salt} = verifyEmail();
+      
       var user = {
         
         id: this.lastID,
         username: req.body.username,
         email: email,
-        token: token,
+        //token: token,
         
       };
-      
+
+      console.log(user);
            
 
       /* SO THIS WAS HOW THE USER WAS AUTOMATICALLY LOGGED IN FROM THE BEFORE TIMES
