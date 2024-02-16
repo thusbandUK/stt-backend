@@ -244,10 +244,12 @@ router.post('/signup', function(req, res, next){
         id: this.lastID,
         username: req.body.username,
         email: email,
-        token: token,
+        //token: token,
         
       };
-      
+      console.log(user);
+      req.user = user;
+      console.log(req.user);
            
 
       /* SO THIS WAS HOW THE USER WAS AUTOMATICALLY LOGGED IN FROM THE BEFORE TIMES
@@ -258,12 +260,25 @@ router.post('/signup', function(req, res, next){
       */
       
           /*PREVIOUSLY THIS WAS HOW IT WORKED AND NOW RESTORED,  */
-      res.status(200).json(user);
+      //res.status(200).json(user);
+      console.log('made it to next function');
+      next();
 
   })    
   
   })
 })
 
+const middlewareExperiment = function (req, res, next) {
+  console.log('middleware triggered');
+  if (req){
+  const user = req.user;
+  console.log(user);
+  res.status(200).json(user);}
+  next();
+
+}
+
+router.use(middlewareExperiment);
 
 module.exports = router;

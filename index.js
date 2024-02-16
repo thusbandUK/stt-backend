@@ -50,6 +50,7 @@ const pgSession = require('connect-pg-simple')(session);
 const indexRouter = require('./routes/index');
 const authRouter = require('./routes/auth');
 
+
 //assign public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -101,7 +102,7 @@ app.use(session({
   // Insert express-session options here
 }));
 
-
+//app.use(middlewareExperiment());
 
 
 
