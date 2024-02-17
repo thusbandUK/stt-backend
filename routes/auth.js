@@ -6,7 +6,7 @@ var router = express.Router();
 var dbAccess = require('../dbConfig');
 const { mailOptions, transporter, generateEmailToken, verificationEmail } = require('../email');
 //var session = require('express-session')
-
+const { dateCompare } = require('../miscFunctions.js/dateCompare');
 const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
 
@@ -161,6 +161,7 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
   var buf = Buffer.from(token, 'hex');
   console.log(buf);
   const client = await pool.connect();
+  const currentDateTime = new Date();
      
 
       try {
@@ -180,6 +181,12 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
             //return cb(null, false, { message: 'There was a problem verifying your email.' }); }
             return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
             //could redirect here
+          }
+          const { date_time_stored } = results.rows[0]
+          console.log(date_time_stored);
+          console.log(currentDateTime);
+          if (!dateCompare(date_time_stored, currentDateTime)){
+            return res.status(500).json({message: 'Token expired, please request a new verification link'});
           }
       
           crypto.pbkdf2(buf, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
@@ -307,7 +314,7 @@ const middlewareExperiment = async function (req, res, next) {
         //console.log(err);      
         return next(err); 
       }
-      client.query('INSERT INTO verification (hashed_string, date_stored, user_id, salt) VALUES ($1, $2, $3, $4) RETURNING *', [hashedToken, date, activeAndID.id, verificationSalt], 
+      client.query('INSERT INTO verification (hashed_string, date_time_stored, user_id, salt) VALUES ($1, $2, $3, $4) RETURNING *', [hashedToken, date, activeAndID.id, verificationSalt], 
         (error, results) => {
         if (error) {
           //error handling
