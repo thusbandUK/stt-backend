@@ -153,54 +153,70 @@ b) generateEmailToken generate random 16-byte salt and random 128-byte buffer / 
 */
 
 
-router.get('/verifyEmail', async function(req,res,next){
+router.get('/verifyEmail/:id/:token', async function(req,res,next){
 
-  var salt = crypto.randomBytes(16);
-      console.log('here is salt');
-      console.log(salt)
-      var token = crypto.randomBytes(128);
-      console.log('here is token');
-      console.log(token);
-      console.log('and now let\'s try token to string');
-      console.log(token.toString('hex'));
-      console.log('and now let\'s try turning it back into a buffer');
-
-      const chunk = Buffer.from(token, 'hex');
-      console.log(chunk);
-
-      
-
-      try {
-        /*
-        crypto.randomBytes(256, (err, buf) => {
-          if (err) throw err;
-          token = buf.toString('hex');
-          //console.log(token);
-          
-          res.status(200).json({token: token});
-          //console.log(`${buf.length} bytes of random data: ${buf.toString('hex')}`);
-        })*/
-        //console.log(stringGeneration);
-        crypto.pbkdf2(token, salt, 100000, 64, 
-         'sha512', (err, derivedKey) => { 
-  
-           if (err) throw err; 
-  
-           // Prints derivedKey 
-           console.log(derivedKey.toString('hex')); 
-           res.status(200).json({derivedKey: derivedKey.toString('hex')});
-        }); 
-
-        
-
-      } catch (error){
-
-        res.status(500).json({message: 'internal server error'});
-      }
+  console.log('verify email get route called');
+  const { id, token } = req.params;
+  console.log(id, token);
+  var buf = Buffer.from(token, 'hex');
+  console.log(buf);
+  const client = await pool.connect();
      
 
-   
+      try {
 
+        await client.query('BEGIN');
+
+        client.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
+      
+          if (error) { 
+            console.log('error 1');
+            return next(error); 
+          }
+          // add if logic saying that if the token is too old then verification has failed and basically to send another
+          if (!results.rows[0]) { 
+            console.log('error 2 - no entry in the verification database match search params');
+      
+            //return cb(null, false, { message: 'There was a problem verifying your email.' }); }
+            return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
+            //could redirect here
+          }
+      
+          crypto.pbkdf2(buf, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
+            
+            if (err) { 
+              console.log('error 3');
+              console.log(err);
+              return next(err); }
+            if (!crypto.timingSafeEqual(results.rows[0].hashed_string, hashedBuffer)) {
+              console.log('error 4 - the results did not match');
+              return next("The hashes did not match");
+              //return cb(null, false, { message: 'There was a problem verifying your email. Link may have expired please try sending another.' });
+              //return res.status(500).json({message: 'There was a problem verifying your email. Link may have expired please try sending another.'})
+              //again could redirect
+            }      
+            
+            //dir below lifted from passport signing in strategy
+            //return cb(null, results.rows[0]);
+            
+            return res.status(200).json({message: 'Email has been verified'});
+      
+          }); // end hashing function
+        }); //end pool request
+        await client.query("commit");
+        //console.log('try function called');
+        //res.status(200).json({message: 'try function called'});
+
+      } catch (error){
+        console.log(error);
+        await client.query("ROLLBACK");
+        res.status(500).json({message: 'There was a problem verifying your email. Link may have expired please try sending another.'});
+        /*
+        okay so you're not handling errors in a good way. Maybe if you do throw new error, that's what makes them aggregate in the catch?
+        */
+      } finally {
+        client.release;
+      }
 })
 
 

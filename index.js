@@ -130,6 +130,12 @@ app.use(function(req, res, next) {
 app.use('/', indexRouter);
 app.use('/', authRouter);
 
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  console.log(err);
+  res.status(500).send('Last stop in the line folks - the error handler got triggered');
+})
+
 
   app.listen(port, () => {
     console.log(`App running on port ${port}.`)
