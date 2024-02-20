@@ -153,6 +153,7 @@ b) generateEmailToken generate random 16-byte salt and random 128-byte buffer / 
 */
 
 
+
 router.get('/verifyEmail/:id/:token', async function(req,res,next){
 
   console.log('verify email get route called');
@@ -162,6 +163,11 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
   console.log(buf);
   const client = await pool.connect();
   const currentDateTime = new Date();
+  //const values = [id]
+  //sets active status to true in users table
+  const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
+  //deletes verification data from verification table
+  const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
      
 
       try {
@@ -182,31 +188,42 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
             return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
             //could redirect here
           }
-          const { date_time_stored } = results.rows[0]
+          const { date_time_stored, user_id } = results.rows[0]
           console.log(date_time_stored);
           console.log(currentDateTime);
           if (!dateCompare(date_time_stored, currentDateTime)){
             return res.status(500).json({message: 'Token expired, please request a new verification link'});
           }
+
+          //The code below checks the supplied token in the verification link and checks it against the value stored in the database
       
           crypto.pbkdf2(buf, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
             
             if (err) { 
-              console.log('error 3');
-              console.log(err);
               return next(err); }
             if (!crypto.timingSafeEqual(results.rows[0].hashed_string, hashedBuffer)) {
               console.log('error 4 - the results did not match');
-              return next("The hashes did not match");
-              //return cb(null, false, { message: 'There was a problem verifying your email. Link may have expired please try sending another.' });
-              //return res.status(500).json({message: 'There was a problem verifying your email. Link may have expired please try sending another.'})
-              //again could redirect
+              const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
+              return next(error);              
             }      
             
-            //dir below lifted from passport signing in strategy
-            //return cb(null, results.rows[0]);
-            
-            return res.status(200).json({message: 'Email has been verified'});
+            req.userId = user_id;
+            next();
+            /*
+            //For database query
+            const values = [ user_id ];
+                        
+            //sets active status to true in users table
+            const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
+            //deletes verification data from verification table
+            const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
+            //const result = await verificationAction(user_id);
+            client.query(activate, values);
+            client.query(deleteVerification, values);
+
+            res.status(200).json({message: 'Email has been verified'});
+            //return res.redirect('/welcome-user');
+            */
       
           }); // end hashing function
         }); //end pool request
@@ -218,17 +235,54 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
         console.log(error);
         await client.query("ROLLBACK");
         res.status(500).json({message: 'There was a problem verifying your email. Link may have expired please try sending another.'});
-        /*
-        okay so you're not handling errors in a good way. Maybe if you do throw new error, that's what makes them aggregate in the catch?
-        */
+        
       } finally {
         client.release;
       }
 })
 
+//middleware follows initial route function directly above. Once the above function has matched the incoming and stored tokens
+//this middleware enacts all the database changes and commits them all as one or reverses the changes if any errors occur
+router.use('/verifyEmail/:id/:token', async function(req,res,next){  
 
+  const id = req.userId;
+  const client = await pool.connect();
 
+  //assigns id to array for use with database queries
+  const values = [id]
+  //query to set active status to true in users table
+  const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
+  //query to delete verification data from verification table
+  const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
 
+  try {
+    //begins a set of nested queries, only once the user has been activated and the verification data deleted will all the changes 
+    //be committed
+    await client.query('BEGIN');
+    
+    const activationResponse = await client.query(activate, values);
+    //checks that the user has been activated in users table
+    if (activationResponse.rows[0].active === true){
+      //database call to delete token details from verification table
+      const deletionResponse = await client.query(deleteVerification, values);
+      //checks that one row of data has been deleted
+      if (deletionResponse.rowCount === 1){
+        //commits all database changes
+        await client.query("commit");
+        return res.status(200).json({message: "email verified"});
+      }
+    }
+    throw new Error("there was a problem completing the actions");
+
+  } catch (error){
+    console.log(error);
+    await client.query('ROLLBACK');
+    return res.status(500).json({message: "something went wrong"});
+    
+  } finally {
+    client.release();
+  }
+})
 
 /* Sign up user*/
 
@@ -290,7 +344,9 @@ router.post('/signup', function(req, res, next){
   })
 })
 
-const middlewareExperiment = async function (req, res, next) {
+//router.post('/signup', function(req, res, next){
+router.use('/signup', async (req, res, next) => {
+//const middlewareExperiment = async function (req, res, next) {
   const { username, email } = req.body;
   const client = await pool.connect();
   const detailsQuery = 'SELECT id, active FROM users WHERE email = $1';
@@ -348,8 +404,8 @@ const middlewareExperiment = async function (req, res, next) {
   res.status(200).json(user);}
   next();*/
 
-}
+})
 
-router.use(middlewareExperiment);
+//router.use(middlewareExperiment);
 
 module.exports = router;

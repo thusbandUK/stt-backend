@@ -8,7 +8,7 @@ const dateCompare = (storedDate, currentDate) => {
     //console.log(differenceInMilliseconds);
     const differenceInHours = differenceInMilliseconds / 3600000;
     //console.log(differenceInHours);
-    if (differenceInHours > 0.2){
+    if (differenceInHours > 100){
         //console.log('returned false');
         return false;
     } else {
