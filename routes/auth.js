@@ -25,6 +25,9 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
 
       return cb(null, false, { message: 'Incorrect username or password.' }); }
 
+    if (results.rows[0].active === false){      
+      return cb(null, false, { message: 'You need to verify your email address.' });        
+    }
     crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
       
       if (err) { return cb(err); }
@@ -74,6 +77,7 @@ router.post('/login', function(req, res, next) {
    req.logIn(user, function(err) {
      if (err) { return next(err); }
      const {id, email, username} = user;
+     
      return res.json({id, email, username});
    })
              
@@ -135,63 +139,40 @@ router.post('/logout', function(req, res, next) {
   });
 });
 */
-/*Email verification function */
 
-/*
-so what needs to happen is:
-in the signing up logic
-1) the password needs to be hashed and stored with its salt
-2) a 128 string needs to be generated, hashed and stored in the database with its salt and then its string sent in an email
-with the id number of the database row where it's stored
-3) separate functions - 
-a) sendEmail, with plenty o' parameters
-b) generateEmailToken generate random 16-byte salt and random 128-byte buffer / string
-4) back in sign up you call generateEmailToken, then store the (hashed) information to the database and then send the email
-
-
-
-*/
 
 
 
 router.get('/verifyEmail/:id/:token', async function(req,res,next){
 
-  console.log('verify email get route called');
+  //harvest id and token from params
   const { id, token } = req.params;
-  console.log(id, token);
-  var buf = Buffer.from(token, 'hex');
-  console.log(buf);
-  const client = await pool.connect();
+  
+  //convert params token to buffer
+  var buf = Buffer.from(token, 'hex');  
+  
+  //creates new date object with current time and date
   const currentDateTime = new Date();
-  //const values = [id]
-  //sets active status to true in users table
-  const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
-  //deletes verification data from verification table
-  const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
-     
-
-      try {
-
-        await client.query('BEGIN');
-
-        client.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
+        
+          pool.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
       
           if (error) { 
-            console.log('error 1');
             return next(error); 
           }
-          // add if logic saying that if the token is too old then verification has failed and basically to send another
+          //Checks to see if verification data exists for id specified in params
           if (!results.rows[0]) { 
-            console.log('error 2 - no entry in the verification database match search params');
-      
-            //return cb(null, false, { message: 'There was a problem verifying your email.' }); }
+                  
+            //If no data in verification table, error message returned
             return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
-            //could redirect here
+            
           }
+          //harvests the user_id and the date and time verification details were stored
           const { date_time_stored, user_id } = results.rows[0]
-          console.log(date_time_stored);
-          console.log(currentDateTime);
+          
+          //checks to see if token has expired
           if (!dateCompare(date_time_stored, currentDateTime)){
+            //if token is too old, error message is sent - timing for age of token can be set in imported function
+            //dateCompare
             return res.status(500).json({message: 'Token expired, please request a new verification link'});
           }
 
@@ -202,48 +183,24 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
             if (err) { 
               return next(err); }
             if (!crypto.timingSafeEqual(results.rows[0].hashed_string, hashedBuffer)) {
-              console.log('error 4 - the results did not match');
+              //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
+              //and is logged as such by the middleware
               const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
               return next(error);              
             }      
-            
+            //adds the userId harvested from the database query to the request
             req.userId = user_id;
-            next();
-            /*
-            //For database query
-            const values = [ user_id ];
-                        
-            //sets active status to true in users table
-            const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
-            //deletes verification data from verification table
-            const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
-            //const result = await verificationAction(user_id);
-            client.query(activate, values);
-            client.query(deleteVerification, values);
-
-            res.status(200).json({message: 'Email has been verified'});
-            //return res.redirect('/welcome-user');
-            */
+            //calls next middleware, which handles database changes
+            next();            
       
           }); // end hashing function
-        }); //end pool request
-        await client.query("commit");
-        //console.log('try function called');
-        //res.status(200).json({message: 'try function called'});
-
-      } catch (error){
-        console.log(error);
-        await client.query("ROLLBACK");
-        res.status(500).json({message: 'There was a problem verifying your email. Link may have expired please try sending another.'});
-        
-      } finally {
-        client.release;
-      }
+        }); //end pool request       
 })
 
 //middleware follows initial route function directly above. Once the above function has matched the incoming and stored tokens
 //this middleware enacts all the database changes and commits them all as one or reverses the changes if any errors occur
 router.use('/verifyEmail/:id/:token', async function(req,res,next){  
+  console.log('verifyEmail getting called');
 
   const id = req.userId;
   const client = await pool.connect();
@@ -284,9 +241,83 @@ router.use('/verifyEmail/:id/:token', async function(req,res,next){
   }
 })
 
+
+/*resent verification eamil */
+
+router.post('/resendVerificationEmail', async function(req, res, next) {
+  //harvests email address from request body
+  const email = req.body.email;
+
+  const client = await pool.connect();
+
+  //assigns email to array for sanitised database query
+  const values = [email];
+
+  //generates random 128 character token and 16 character salt
+  const { verificationToken, verificationSalt } = generateEmailToken();
+  //converts verification to string to be emailed to user to include as params in their verification link
+  const stringToken = verificationToken.toString('hex');
+
+  //database query for user with the email address in the request body
+  const userSearch = 'SELECT id, active FROM users WHERE email = $1';
+
+  //generates new date object to store with hashed token
+  const date = new Date();
+  try {
+    
+    await client.query("begin");
+    //queries database to find the user with that email address
+    const userResponse = await client.query(userSearch, values);
+    
+    if (!userResponse.rows[0]){
+      //No user with that email stored in users error handling
+      return res.status(500).json({message: "No user details available - trying signing up again"});
+    }
+    console.log(userResponse.rows[0]);
+    if (userResponse.rows[0].active === true){
+      //Email already verified error handling
+      return res.status(500).json({message: "Email verified already. Try signing in."})
+    }
+    //synchronously hashes the token generated above
+    const dataToWrite = crypto.pbkdf2Sync(verificationToken, verificationSalt, 310000, 32, 'sha256');    
+      
+      //checks to see if there is already any data in the verification table for that user
+      const verificationEntry = await client.query('SELECT * FROM verification WHERE user_id = $1', [userResponse.rows[0].id]);
+      
+      if (verificationEntry.rows[0]){
+        //Overwrites any existing entries
+        await client.query('DELETE FROM verification WHERE user_id = $1', [userResponse.rows[0].id]);
+      }
+      
+      //inserts hashed token, salt etc. into verification table
+      const newDetails = await client.query('INSERT INTO verification (hashed_string, date_time_stored, user_id, salt) VALUES ($1, $2, $3, $4) RETURNING *', [dataToWrite, date, userResponse.rows[0].id, verificationSalt]) 
+        
+
+        //extracts id from verification database query
+        const  id  = newDetails.rows[0].id;   
+        
+        //Sends the email with the link
+        const emailResponse = verificationEmail(email, stringToken, id)
+        client.query("commit");
+        return res.status(200).json({message: 'Verification email sent'});
+      
+
+  } catch (error){
+    console.log(error);
+    client.query("ROLLBACK");
+
+  } finally {
+    client.release();
+
+  }
+  
+})
+
 /* Sign up user*/
 
 router.post('/signup', function(req, res, next){
+ 
+  
   const { username, email } = req.body
   //console.log('hello and username is...');
   //console.log(req.body);
@@ -405,7 +436,5 @@ router.use('/signup', async (req, res, next) => {
   next();*/
 
 })
-
-//router.use(middlewareExperiment);
 
 module.exports = router;
