@@ -30,7 +30,7 @@ const generateEmailToken = () => {
   return {verificationSalt: salt, verificationToken: token};
 
 }
-
+/*
 async function verificationEmail(email, token, verificationId) {
   const url = process.env.DEV_ORIGIN;
   const path = `${url}/verification-landing?id=${verificationId}&token=${token}`; // plain text body
@@ -51,4 +51,64 @@ async function verificationEmail(email, token, verificationId) {
        
   }
 
-   module.exports = { mailOptions, transporter, generateEmailToken, verificationEmail };
+  async function resetEmail(email, token, verificationId) {
+    const url = process.env.DEV_ORIGIN;
+    const path = `${url}/reset-landing?id=${verificationId}&token=${token}`; // plain text body
+    const mailOptionsVerification = {
+      from: process.env.EMAIL_ADDRESS, // sender address
+      to: email,
+      subject: 'Reset password verification link ', // Subject line
+      html: `<p>Click the <a href=${path}>link</a> to verify your email</p>`, // plain text body
+    }
+    
+    await transporter.sendMail(mailOptionsVerification, function(err, info) {
+      if (err) {
+     // handle error
+        return(err)
+      }
+      return "email sent"
+    })
+         
+    }
+*/
+
+    //assigns message and subject line details for pathTypes "verification" and "reset"
+
+    const messageDetails = (pathType) => {
+            
+      switch(pathType){
+        case "reset":
+          return {subject: "Reset password verification link", messageFragment: "reset your password"};
+          break;
+        case "verification":
+          return {subject : 'Email verification link', messageFragment: "verify your email"};
+          break;
+        default: return {subject: "Message from Science Tutor Tom", messageFragment: "say hello"};
+      }      
+    }
+
+    //takes pathType "reset" or "verification"
+    async function sendEmail(email, token, verificationId, pathType) {
+      
+      const url = process.env.DEV_ORIGIN;
+      const path = `${url}/${pathType}-landing?id=${verificationId}&token=${token}`; // plain text body
+      const details = messageDetails(pathType);
+      const mailOptionsVerification = {
+        from: process.env.EMAIL_ADDRESS, // sender address
+        to: email,
+        subject: details.subject, // Subject line
+        html: `<p>Click the <a href=${path}>link</a> to ${details.messageFragment}</p>`, // plain text body
+      }
+      
+      await transporter.sendMail(mailOptionsVerification, function(err, info) {
+        if (err) {
+       // handle error
+          return(err)
+        }
+        return "email sent"
+      })
+           
+      }
+
+   //module.exports = { mailOptions, transporter, generateEmailToken, verificationEmail, resetEmail, sendEmail };
+   module.exports = { mailOptions, transporter, generateEmailToken, sendEmail };
