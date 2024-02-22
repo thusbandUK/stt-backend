@@ -9,6 +9,7 @@ const { mailOptions, transporter, generateEmailToken, verificationEmail, resetEm
 const { dateCompare } = require('../miscFunctions.js/dateCompare');
 const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
+const { databaseExperiment } = require('../miscFunctions.js/databaseExperiment');
 
 
 //Passport authentication logic
@@ -241,10 +242,32 @@ router.use('/verifyEmail/:id/:token', async function(req,res,next){
   }
 })
 
+router.post('/resendVerificationEmail', async function (req, res, next) {
+  //harvests email address from request body
+  const email = req.body.email;
 
-/*resend verification eamil */
+  try {
 
-router.post('/resendVerificationEmail', async function(req, res, next) {
+    const response = await databaseExperiment(email, "verification");
+    //console.log(response);
+    if (!response.ok){
+      //console.log(response.message);
+      //throw new Error (response);
+      return res.status(500).json({message: response.message});
+    }
+    return res.status(200).json({message: "Email sent."});
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json(error);
+
+  }
+
+})
+
+/*resend verification eamil temporarily changed to resendVerificationEmail2 */
+
+router.post('/resendVerificationEmail2', async function(req, res, next) {
   //harvests email address from request body
   const email = req.body.email;
 
@@ -259,6 +282,8 @@ router.post('/resendVerificationEmail', async function(req, res, next) {
   //generates new date object to store with hashed token
   const date = new Date();
   try {
+    /*const remoteFunction = await databaseExperiment();
+    console.log(remoteFunction);*/
 
     //generates random 128 character token and 16 character salt
     const { verificationToken, verificationSalt } = generateEmailToken();
@@ -308,15 +333,30 @@ router.post('/resendVerificationEmail', async function(req, res, next) {
     return res.status(500).json({message: 'There was some kind of error'});
 
   } finally {
-    await client.release();
-
-  }
-  
+    client.release();
+  }  
 })
 
-/*Reset password */
-
 router.post('/resetPassword', async function(req,res,next){
+  const email = req.body.email;
+  
+  try {
+    const response = await databaseExperiment(email, "reset");
+    if (!response.ok){
+      
+      return res.status(500).json({message: response.message});
+    }
+    return res.status(200).json({message: "Email sent."});
+
+  } catch (error){
+    console.log(error);
+    return res.status(500).json({message: error});
+  }
+})
+
+/*Reset password temporarily changing below to resetPassword2*/
+
+router.post('/resetPassword2', async function(req,res,next){
   const email = req.body.email;
   const client = await pool.connect();
   //assigns email to array for sanitised database query
