@@ -9,6 +9,7 @@ let transporter = nodeMailer.createTransport({
   auth: {
     user: process.env.EMAIL_ADDRESS,
     pass: process.env.EMAIL_PASSWORD,
+    //pass: 'kippersforbreakfastAuntElga',
   },
   tls: {
     // do not fail on invalid certs
@@ -88,7 +89,8 @@ async function verificationEmail(email, token, verificationId) {
     }
 
     //takes pathType "reset" or "verification"
-    async function sendEmail(email, token, verificationId, pathType) {
+    //deleted async from below
+    function createEmailOptions(email, token, verificationId, pathType) {
       
       const url = process.env.DEV_ORIGIN;
       const path = `${url}/${pathType}-landing?id=${verificationId}&token=${token}`; // plain text body
@@ -100,15 +102,12 @@ async function verificationEmail(email, token, verificationId) {
         html: `<p>Click the <a href=${path}>link</a> to ${details.messageFragment}</p>`, // plain text body
       }
       
-      await transporter.sendMail(mailOptionsVerification, function(err, info) {
-        if (err) {
-       // handle error
-          return(err)
-        }
-        return "email sent"
-      })
+      return mailOptionsVerification;
+
+
+      
            
       }
 
    //module.exports = { mailOptions, transporter, generateEmailToken, verificationEmail, resetEmail, sendEmail };
-   module.exports = { mailOptions, transporter, generateEmailToken, sendEmail };
+   module.exports = { mailOptions, transporter, generateEmailToken, createEmailOptions };
