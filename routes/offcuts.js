@@ -198,4 +198,49 @@ router.use('/signup2', async (req, res, next) => {
   next();*//*
 
 })
+
+//middleware follows initial route function directly above. Once the above function has matched the incoming and stored tokens
+//this middleware enacts all the database changes and commits them all as one or reverses the changes if any errors occur
+router.use('/verifyEmail/:id/:token', async function(req,res,next){  
+  console.log('verifyEmail getting called');
+
+  const id = req.userId;
+  const client = await pool.connect();
+
+  //assigns id to array for use with database queries
+  const values = [id]
+  //query to set active status to true in users table
+  const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
+  //query to delete verification data from verification table
+  const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
+
+  try {
+    //begins a set of nested queries, only once the user has been activated and the verification data deleted will all the changes 
+    //be committed
+    await client.query('BEGIN');
+    
+    const activationResponse = await client.query(activate, values);
+    //checks that the user has been activated in users table
+    if (activationResponse.rows[0].active === true){
+      //database call to delete token details from verification table
+      const deletionResponse = await client.query(deleteVerification, values);
+      //checks that one row of data has been deleted
+      if (deletionResponse.rowCount === 1){
+        //commits all database changes
+        await client.query("commit");
+        return res.status(200).json({message: "email verified"});
+      }
+    }
+    throw new Error("there was a problem completing the actions");
+
+  } catch (error){
+    console.log(error);
+    await client.query('ROLLBACK');
+    return res.status(500).json({message: "something went wrong"});
+    
+  } finally {
+    client.release();
+  }
+})
+
 */

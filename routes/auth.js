@@ -9,6 +9,7 @@ const { dateCompare } = require('../miscFunctions/dateCompare');
 const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
 const { storeVerificationDetails } = require('../miscFunctions/storeVerificationDetails');
+const { updateDatabase, matchToken, prepareBuffers } = require('../miscFunctions/verifyDetails');
 
 
 //Passport authentication logic
@@ -99,9 +100,104 @@ router.post('/logout', (req, res, next) => {
 	});
 });
 
-//verify email logic
+//below temp changed to verifyEmail2 because it doesn't work
 
 router.get('/verifyEmail/:id/:token', async function(req,res,next){
+  //harvest id and token from params
+  const { id, token } = req.params;
+
+  //convert params token to buffer
+  var buf = Buffer.from(token, 'hex');  
+  
+  const storedDetails = await prepareBuffers(id, token, "verification");
+
+  //The code below checks the supplied token in the verification link and checks it against the value stored in the database
+      
+  crypto.pbkdf2(buf, storedDetails.salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
+            
+    if (err) { 
+      return next(err); }
+    if (!crypto.timingSafeEqual(storedDetails.hashed_string, hashedBuffer)) {
+      //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
+      //and is logged as such by the middleware
+      const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
+      return next(error);              
+    }      
+    //adds the userId harvested from the database query to the request
+    //req.userId = user_id;
+    
+    //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
+    //verification
+    const updateDatabaseResult = updateDatabase(storedDetails.user_id, "verification");
+    updateDatabaseResult.then(function(data){
+      
+      if (data === "actions completed"){
+        return res.status(200).json({message: "Verification complete!"})
+      } else {
+        console.log(data);
+        return res.status(500).json({message: "something went wrong"});
+      }
+    })
+    //next();            
+
+  }); // end hashing function
+
+})
+
+/*
+supplied in body: id and string token
+checks match, deletes token and assoc data from database
+returns instruction to enable input of new password, which will then be harvested via different POST path
+*/
+
+router.post('/reset-password-request', async function (req, res, next){
+
+  //harvests id and token
+  const { id, token } = req.body;
+
+  //convert params token to buffer
+  var buf = Buffer.from(token, 'hex');  
+
+  //returns details stored with the supplied id
+  const storedDetails = await prepareBuffers(id, token, "reset");
+
+  //The code below checks the supplied token in the reset password link and checks it against the value stored in the database
+      
+  crypto.pbkdf2(buf, storedDetails.salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
+            
+    if (err) { 
+      return next(err); }
+    if (!crypto.timingSafeEqual(storedDetails.hashed_string, hashedBuffer)) {
+      //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
+      //and is logged as such by the middleware
+      const error = new Error("Wrong link. Try resetting your password again");
+      return next(error);              
+    }      
+    //adds the userId harvested from the database query to the request
+    //req.userId = user_id;
+    
+    //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
+    //verification
+    const updateDatabaseResult = updateDatabase(storedDetails.user_id, "reset");
+    updateDatabaseResult.then(function(data){
+      
+      if (data === "actions completed"){
+        return res.status(200).json({message: "Please input password!"})
+      } else {
+        console.log(data);
+        return res.status(500).json({message: "something went wrong"});
+      }
+    })
+    //next();            
+
+  }); // end hashing function
+
+})
+
+//verify email logic, see not working verifyEmail2 above
+
+router.get('/verifyEmail2/:id/:token', async function(req,res,next){
+  
 
   //harvest id and token from params
   const { id, token } = req.params;
@@ -109,14 +205,17 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
   //convert params token to buffer
   var buf = Buffer.from(token, 'hex');  
   
+  
   //creates new date object with current time and date
   const currentDateTime = new Date();
         
           pool.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
       
           if (error) { 
+            console.log(error);
             return next(error); 
           }
+          
           //Checks to see if verification data exists for id specified in params
           if (!results.rows[0]) { 
                   
@@ -124,6 +223,7 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
             return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
             
           }
+          
           //harvests the user_id and the date and time verification details were stored
           const { date_time_stored, user_id } = results.rows[0]
           
@@ -147,57 +247,26 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
               return next(error);              
             }      
             //adds the userId harvested from the database query to the request
-            req.userId = user_id;
-            //calls next middleware, which handles database changes
-            next();            
+            //req.userId = user_id;
+            
+            //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
+            //verification
+            const verificationResult = verifyDetails(user_id, buf);
+            verificationResult.then(function(data){
+              
+              if (data === "actions completed"){
+                return res.status(200).json({message: "Verification complete!"})
+              } else {
+                console.log(data);
+                return res.status(500).json({message: "something went wrong"});
+              }
+            })
+            //next();            
       
           }); // end hashing function
         }); //end pool request       
 })
 
-//middleware follows initial route function directly above. Once the above function has matched the incoming and stored tokens
-//this middleware enacts all the database changes and commits them all as one or reverses the changes if any errors occur
-router.use('/verifyEmail/:id/:token', async function(req,res,next){  
-  console.log('verifyEmail getting called');
-
-  const id = req.userId;
-  const client = await pool.connect();
-
-  //assigns id to array for use with database queries
-  const values = [id]
-  //query to set active status to true in users table
-  const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
-  //query to delete verification data from verification table
-  const deleteVerification = 'DELETE FROM verification WHERE user_id = $1 RETURNING *';  
-
-  try {
-    //begins a set of nested queries, only once the user has been activated and the verification data deleted will all the changes 
-    //be committed
-    await client.query('BEGIN');
-    
-    const activationResponse = await client.query(activate, values);
-    //checks that the user has been activated in users table
-    if (activationResponse.rows[0].active === true){
-      //database call to delete token details from verification table
-      const deletionResponse = await client.query(deleteVerification, values);
-      //checks that one row of data has been deleted
-      if (deletionResponse.rowCount === 1){
-        //commits all database changes
-        await client.query("commit");
-        return res.status(200).json({message: "email verified"});
-      }
-    }
-    throw new Error("there was a problem completing the actions");
-
-  } catch (error){
-    console.log(error);
-    await client.query('ROLLBACK');
-    return res.status(500).json({message: "something went wrong"});
-    
-  } finally {
-    client.release();
-  }
-})
 
 router.post('/resendVerificationEmail', async function (req, res, next) {
   //harvests email address from request body
@@ -224,6 +293,7 @@ router.post('/resendVerificationEmail', async function (req, res, next) {
 //reset password route
 
 router.post('/resetPassword', async function(req,res,next){
+  console.log('reset password route called');
   const email = req.body.email;
   
   try {
