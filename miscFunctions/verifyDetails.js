@@ -39,32 +39,32 @@ async function updateDatabase(id, mode, password){
        //checks that one row of data has been deleted
        if (deletionResponse.rowCount === 1){    
         
-        if (mode === "verification"){
-          const activationResponse = await client.query(activate, values);
+        //for both reset and verification routes, sets active to true
+        const activationResponse = await client.query(activate, values);
       
-          //checks that the user has been activated in users table
-          if (activationResponse.rows[0].active === true){
-            //commits all database changes
-            await client.query("commit");
-            return "actions completed";
-          }         
-        }
-        if (mode === "reset"){
-          //generates random salt;
-          var salt = crypto.randomBytes(16);  
-          //synchronously hashes the token generated above
-          const hashedPassword = crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
-          //prepares array for database query
-          const passwordValues = [hashedPassword, salt, id];
-          //attempts to overwrite password and salt in database
-          const passwordResponse = await client.query(overwritePassword, passwordValues);
-          //checks the query has succeeded
-          if (passwordResponse.rows[0].id === id){
-            //commits all database changes
-            await client.query("commit");
-            return "actions completed";
+        //checks that the user has been activated in users table
+        if (activationResponse.rows[0].active === true){
+          //for password reset only, if clause handles storage of updated password details
+          if (mode === "reset"){
+            //generates random salt;
+            var salt = crypto.randomBytes(16);  
+            //synchronously hashes the token generated above
+            const hashedPassword = crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
+            //prepares array for database query
+            const passwordValues = [hashedPassword, salt, id];
+            //attempts to overwrite password and salt in database
+            const passwordResponse = await client.query(overwritePassword, passwordValues);
+            //checks the query has succeeded
+            if (passwordResponse.rows[0].id === id){
+              //commits all database changes
+              await client.query("commit");
+              return "actions completed";
+            }
           }
-        }         
+          //commits all database changes for successful email verification calls
+          await client.query("commit");
+          return "actions completed";
+        }               
        }
          
       const error = new Error("something went wrong");
