@@ -393,7 +393,7 @@ router.use('/signup', async (req,res,next) => {
       //throw new Error (response);
       return res.status(500).json({message: response.message});
     }
-    return res.status(200).json({message: "Email sent."});
+    return res.status(200).json({message: "Email sent.", email: email});
 
   } catch (error) {
     console.log(error);
