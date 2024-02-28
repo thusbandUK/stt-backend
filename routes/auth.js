@@ -153,7 +153,7 @@ returns instruction to enable input of new password, which will then be harveste
 router.post('/reset-password-request', async function (req, res, next){
 
   //harvests id and token
-  const { id, token } = req.body;
+  const { id, token, password } = req.body;
 
   //convert params token to buffer
   var buf = Buffer.from(token, 'hex');  
@@ -178,11 +178,11 @@ router.post('/reset-password-request', async function (req, res, next){
     
     //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
     //verification
-    const updateDatabaseResult = updateDatabase(storedDetails.user_id, "reset");
+    const updateDatabaseResult = updateDatabase(storedDetails.user_id, "reset", password);
     updateDatabaseResult.then(function(data){
       
       if (data === "actions completed"){
-        return res.status(200).json({message: "Please input password!"})
+        return res.status(200).json({message: "Password updated"});
       } else {
         console.log(data);
         return res.status(500).json({message: "something went wrong"});
@@ -311,6 +311,12 @@ router.post('/resetPassword', async function(req,res,next){
   }
 })
 
+
+router.post('/enterPassword', function(req, res, next){
+  const { password } = req.body;
+  console.log(password);
+  return res.status(200).json({message: "new password received"});
+})
 
 /* Sign up user*/
 

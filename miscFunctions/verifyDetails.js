@@ -8,9 +8,9 @@ const { dateCompare } = require('./dateCompare');
 const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
 
-//accepts id and mode = string: verification or reset
+//accepts id and mode = string: verification or reset, password parameter only required for password reset mode
 
-async function updateDatabase(id, mode){
+async function updateDatabase(id, mode, password){
 //router.use('/verifyEmail/:id/:token', async function(req,res,next){  
     
   
@@ -20,11 +20,13 @@ async function updateDatabase(id, mode){
     //assigns id to array for use with database queries
     const values = [id]
     
+    
     //query to set active status to true in users table
     const activate = 'UPDATE users SET active = true WHERE id = $1 RETURNING *';
     //query to delete verification data from verification table
     const deleteVerification = `DELETE FROM ${mode} WHERE user_id = $1 RETURNING *`;  
-    //const deleteVerification = 'DELETE FROM verification WHERE id = $1 RETURNING *';  
+    //const deleteVerification = 'DELETE FROM verification WHERE id = $1 RETURNING *';
+    const overwritePassword = 'UPDATE users SET hashed_password = $1, salt = $2 WHERE id = $3 RETURNING *';
   
     try {
       //begins a set of nested queries, only once the user has been activated and the verification data deleted will all the changes 
@@ -47,29 +49,24 @@ async function updateDatabase(id, mode){
             return "actions completed";
           }         
         }
-         //commits all database changes
-         await client.query("commit");
-         return "actions completed";
+        if (mode === "reset"){
+          //generates random salt;
+          var salt = crypto.randomBytes(16);  
+          //synchronously hashes the token generated above
+          const hashedPassword = crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
+          //prepares array for database query
+          const passwordValues = [hashedPassword, salt, id];
+          //attempts to overwrite password and salt in database
+          const passwordResponse = await client.query(overwritePassword, passwordValues);
+          //checks the query has succeeded
+          if (passwordResponse.rows[0].id === id){
+            //commits all database changes
+            await client.query("commit");
+            return "actions completed";
+          }
+        }         
        }
-         //return res.status(200).json({message: "email verified"});
-
-      /*
-      const activationResponse = await client.query(activate, values);
-      
-      //checks that the user has been activated in users table
-      if (activationResponse.rows[0].active === true){
-                
-        //database call to delete token details from verification table
-        const deletionResponse = await client.query(deleteVerification, values);
-        
-        //checks that one row of data has been deleted
-        if (deletionResponse.rowCount === 1){          
-          //commits all database changes
-          await client.query("commit");
-          return "actions completed";
-          //return res.status(200).json({message: "email verified"});
-        }
-      }*/
+         
       const error = new Error("something went wrong");
       return error;
   
