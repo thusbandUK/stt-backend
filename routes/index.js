@@ -58,7 +58,10 @@ console.log(req.user);
     
     const dbResponse = await client.query(detailsQuery, detailsReferences);
     //console.log(dbResponse);
-    const detailsValues = dbResponse.rows[0];
+    if (dbResponse.rowCount === 0){
+      next();
+    } else {
+      const detailsValues = dbResponse.rows[0];
     //console.log(detailsValues);
 
     //commits database changes, provided there have been no errors
@@ -66,6 +69,9 @@ console.log(req.user);
 
     //returns status okay with all the details for that journal entry
     return res.status(200).json(detailsValues);    
+
+    }
+    
     
   } catch (err) {
     //returns generic error message
@@ -75,6 +81,43 @@ console.log(req.user);
     //releases client from pool
     client.release()
   }  
+
+})
+
+//middleware follows welcome GET above IF nothing in details(2) table, creates entry for that table incl username and foreign key
+
+router.use('/welcome', async function(req,res,next) {
+  if (!req.user){    
+    return res.status(404).json('no user logged in');
+  }
+  const client = await pool.connect()
+
+  const userId = req.user.id;
+  
+  const usersQuery = 'SELECT username FROM users WHERE id = $1';
+  const usersReferences = [userId]
+  const detailsQuery = 'INSERT INTO details2 (username, user_id) VALUES ($1, $2) RETURNING *';
+  
+  try {
+    await client.query("begin");
+    const usersResponse = await client.query(usersQuery, usersReferences);
+    const detailsValues = [usersResponse.rows[0].username, userId];
+    const detailsResponse = await client.query(detailsQuery, detailsValues);
+
+    if (detailsResponse.rowCount === 0){
+      return res.status(500).json({message: "something went wrong"});
+    } else {
+      await client.query("commit");
+      return res.status(200).json(detailsResponse.rows[0]);
+    }
+  } catch (error) {
+    console.log(error);
+    await client.query("ROLLBACK");
+    return res.status(500).json({message: "Something went wrong"});
+
+  } finally {
+    client.release();
+  }
 
 })
 
