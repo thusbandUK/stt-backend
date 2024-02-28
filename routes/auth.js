@@ -100,7 +100,7 @@ router.post('/logout', (req, res, next) => {
 	});
 });
 
-//below temp changed to verifyEmail2 because it doesn't work
+//Current working verifyEmail route (see verifyEmail2 below)
 
 router.get('/verifyEmail/:id/:token', async function(req,res,next){
   //harvest id and token from params
