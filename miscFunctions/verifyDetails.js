@@ -181,13 +181,16 @@ async function prepareBuffers(id, token, mode){
   //convert params token to buffer
   var buf = Buffer.from(token, 'hex');  
 
+  console.log(id);
+  console.log(mode);
   //const client = pool.connect();
     
   //creates new date object with current time and date
   const currentDateTime = new Date();
 
   try {
-    const storedTimestampUserId = await pool.query(`SELECT * FROM ${mode} WHERE id = $1`, [ id ]);
+    const storedTimestampUserId = await pool.query(`SELECT * FROM ${mode} WHERE user_id = $1`, [ id ]);
+    console.log(storedTimestampUserId);
 
     //Checks to see if verification data exists for id specified in params
     if (storedTimestampUserId.rowCount === 0){ 

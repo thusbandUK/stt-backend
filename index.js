@@ -40,10 +40,13 @@ app.use(
   }),
 );
 
+
+
 const logger = require('morgan');
 const passport = require('passport');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
+
 
 
 //authorisation and routes logic import
@@ -79,6 +82,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
 
+
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -86,6 +90,13 @@ app.use(express.urlencoded({ extended: false }));
 // for express-session module to work as of version 1.5.0+
 // app.use(cookieParser('keyboard cat'));
 app.use(express.static(path.join(__dirname, 'public')));
+
+/*
+app.use(function (req, res, next) {
+  console.log('function middleware before app.use session called');
+  console.log(req.session);
+  next();
+})*/
 
 app.use(session({
   store: new pgSession ({
@@ -102,16 +113,25 @@ app.use(session({
   // Insert express-session options here
 }));
 
+/*
+app.use(function (req, res, next) {
+  console.log('function middleware after app.use session called');
+  console.log(req.session);
+  next();
+})*/
+
 //app.use(middlewareExperiment());
 
 
 
 
-console.log('passport initialize should run next?');
+
 app.use(passport.initialize());
-console.log('passport session should run next?');
+
 app.use(passport.session());
+
 app.use(passport.authenticate('session'));
+
 // Need to be used within routes...
 // app.use(passport.authenticate('local'));
 

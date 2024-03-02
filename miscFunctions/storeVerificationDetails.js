@@ -62,7 +62,8 @@ async function storeVerificationDetails (email, mode) {
         const newDetails = await client.query(`INSERT INTO ${mode} (hashed_string, date_time_stored, user_id, salt) VALUES ($1, $2, $3, $4) RETURNING *`, [dataToWrite, date, userResponse.rows[0].id, verificationSalt]) 
         
         //extracts id from verification database query
-        const  id  = newDetails.rows[0].id;   
+        const  id  = newDetails.rows[0].user_id;   
+        //console.log(id);
               
         //Creates the mailOptions object to send email via transporter tomorrow
         const emailOptions = createEmailOptions(email, stringToken, id, mode)

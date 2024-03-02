@@ -38,6 +38,7 @@ router.get('/email', async function(req,res,next) {
 router.get('/welcome', async function(req,res,next) {
 console.log('welcome get request called at back end');
 if (!req.user){
+  console.log('went the way of no req.user')
   //console.log(req);
   //console.log(req.sessionID);
   //console.log('there weren\'t no req.user');
@@ -58,6 +59,7 @@ console.log(req.user);
     
     const dbResponse = await client.query(detailsQuery, detailsReferences);
     //console.log(dbResponse);
+    console.log('db response got made');
     if (dbResponse.rowCount === 0){
       next();
     } else {
@@ -87,6 +89,7 @@ console.log(req.user);
 //middleware follows welcome GET above IF nothing in details(2) table, creates entry for that table incl username and foreign key
 
 router.use('/welcome', async function(req,res,next) {
+  console.log('welcome post middleware called');
   if (!req.user){    
     return res.status(404).json('no user logged in');
   }

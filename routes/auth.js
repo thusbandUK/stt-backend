@@ -10,6 +10,7 @@ const Pool = require('pg').Pool
 const pool = new Pool(dbAccess);
 const { storeVerificationDetails } = require('../miscFunctions/storeVerificationDetails');
 const { updateDatabase, matchToken, prepareBuffers } = require('../miscFunctions/verifyDetails');
+const { deleteAllRecords } = require('../miscFunctions/delete');
 
 
 //Passport authentication logic
@@ -86,14 +87,43 @@ router.post('/login', function(req, res, next) {
 });
 
 //logout
+/*
+router.get('/logout', function (req, res) {
+  req.logOut();
+  res.status(200).clearCookie('connect.sid', {
+    path: '/',
+    secure: false,
+    httpOnly: false,
+    domain: 'localhost:5000',
+    sameSite: true,
+  });
+  req.session.destroy(function (err) {
+    res.send();
+  });
+});
+*/
+/*
+router.get('/logout', function (req, res) {
+  req.logOut();
+  res.status(200).clearCookie('connect.sid', {
+    path: '/'
+  });
+  req.session.destroy(function (err) {
+    res.redirect('/');
+  });
+});
 
-router.post('/logout', (req, res, next) => {
+*/
+
+router.get('/logout', (req, res, next) => {
+
+  //console.log(res.cookie());
 	
 	req.logout(function(err) {  // logout of passport
     //req.session = null;
     
 		  req.session.destroy(function (err) { // destroy the session
-      res.clearCookie('connect.sid');  // clear the session cookie
+      res.clearCookie('connect.sid', {path: '/'});  // clear the session cookie
 			res.send(); // send to the client
 		});
     //res.send();
@@ -110,6 +140,7 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
   var buf = Buffer.from(token, 'hex');  
   
   const storedDetails = await prepareBuffers(id, token, "verification");
+  console.log(storedDetails);
 
   //The code below checks the supplied token in the verification link and checks it against the value stored in the database
       
@@ -312,12 +343,6 @@ router.post('/resetPassword', async function(req,res,next){
 })
 
 
-router.post('/enterPassword', function(req, res, next){
-  const { password } = req.body;
-  console.log(password);
-  return res.status(200).json({message: "new password received"});
-})
-
 /* Sign up user*/
 
 router.post('/signup', function(req, res, next){
@@ -401,6 +426,85 @@ router.use('/signup', async (req,res,next) => {
 
   }
 })
+
+/*
+Want wants to happen - it should include req.user and then you can access the id
+then send delete calls to details2, reset, verification, via user_id
+then send a delete call to users via id
+then logout
+then (possibly via front end) redirect user
+it also needs to delete the session from the database as well as clear the cookie
+
+*/
+
+router.get('/redirect', async function (req, res, next){
+  return res.status(200).json({message: "Your account has successfully been deleted"});
+})
+
+router.post('/delete-account2', async function (req, res, next){
+  //const cookie = req.body.cookie;
+  console.log(req.session.id);
+  return res.status(200).json({message: "route clicked"});
+
+})
+
+//temporarily changed to 2 for experiment above
+
+router.post('/delete-account', async function (req, res, next){
+  if (!req.user){
+    return res.redirect('/redirect');
+  }
+  const { password } = req.body;
+  
+  const { id } = req.user;
+  console.log(id);
+  //return res.status(200).json({message: id});
+
+  const deleteRequest = 'DELETE FROM users WHERE id = $1 RETURNING *';
+  
+  const queryValues = [ id ];
+  const client = await pool.connect();
+
+  pool.query('SELECT * FROM users WHERE id = $1', [ id ], function(error, results) {
+      
+    if (error) { return cb(error); }
+    if (!results.rows[0]) { 
+
+      return res.status(500).json({ message: 'Incorrect username or password.' }); }
+
+    crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
+      
+      if (err) { return next(err); }
+      if (!crypto.timingSafeEqual(results.rows[0].hashed_password, hashedPassword)) {
+        
+        return res.status(500).json({ message: 'Incorrect username or password.' });
+      }
+
+      const databaseResponse = deleteAllRecords(req.user.id, req.session.id);
+      databaseResponse.then((response) => {
+        if (response){
+          req.logout(function(err) {  // logout of passport
+            //req.session = null;
+            
+              req.session.destroy(function (err) { // destroy the session
+              res.clearCookie('connect.sid');  // clear the session cookie
+              res.send(); // send to the client
+            });
+          //return res.redirect("/account-deleted");
+        })
+      } else {
+        return next(new Error("There was a problem deleting the records"));
+      }
+    })
+      
+      //return next();
+
+    }); //crypto query ends
+  }); //pool query ends
+})
+
+
+
 
 
 
