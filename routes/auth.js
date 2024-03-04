@@ -366,38 +366,22 @@ router.post('/signup', function(req, res, next){
         //console.log('if error called');
 
         if (error.constraint === "users_email_key"){
-          //console.log('users email key called');
-          //return res.status(500).send("A user with that email already exists. Please sign up with a different email address");
+          
           return res.status(500).json({message: "A user with that email already exists. Please sign up with a different email address"});
         }
-        //console.log(error.constraint);
-        //throw error
+        
         return res.status(500).json({message: "unspecified server error"})
       }
-      //const {token, salt} = verifyEmail();
+      
       var user = {
         
         id: this.lastID,
         username: req.body.username,
-        email: email,
-        //token: token,
-        
+        email: email,        
       };
-      console.log(user);
-      req.user = user;
-      console.log(req.user);
-           
-
-      /* SO THIS WAS HOW THE USER WAS AUTOMATICALLY LOGGED IN FROM THE BEFORE TIMES
-      req.logIn(user, function(err) {
-        if (err) { return next(err); }
-        return res.json(user);
-      })
-      */
       
-          /*PREVIOUSLY THIS WAS HOW IT WORKED AND NOW RESTORED,  */
-      //res.status(200).json(user);
-      console.log('made it to next function');
+      req.user = user;
+      
       next();
 
   })    
@@ -427,25 +411,8 @@ router.use('/signup', async (req,res,next) => {
   }
 })
 
-/*
-Want wants to happen - it should include req.user and then you can access the id
-then send delete calls to details2, reset, verification, via user_id
-then send a delete call to users via id
-then logout
-then (possibly via front end) redirect user
-it also needs to delete the session from the database as well as clear the cookie
-
-*/
-
 router.get('/redirect', async function (req, res, next){
   return res.status(200).json({message: "Your account has successfully been deleted"});
-})
-
-router.post('/delete-account2', async function (req, res, next){
-  //const cookie = req.body.cookie;
-  console.log(req.session.id);
-  return res.status(200).json({message: "route clicked"});
-
 })
 
 //temporarily changed to 2 for experiment above
@@ -487,7 +454,7 @@ router.post('/delete-account', async function (req, res, next){
             //req.session = null;
             
               req.session.destroy(function (err) { // destroy the session
-              res.clearCookie('connect.sid');  // clear the session cookie
+              res.clearCookie('connect.sid', {path: '/'});  // clear the session cookie
               res.send(); // send to the client
             });
           //return res.redirect("/account-deleted");
