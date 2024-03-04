@@ -361,7 +361,7 @@ router.post('/signup', function(req, res, next){
       return next(err); 
     }
     pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
-    (error, results) => {
+    async (error, results) => {
       if (error) {
         //console.log('if error called');
 
@@ -382,33 +382,17 @@ router.post('/signup', function(req, res, next){
       
       req.user = user;
       
-      next();
-
+      //next();
+      const response = await storeVerificationDetails(email, "verification");
+      
+      if (!response.id){
+      
+        return res.status(500).json({message: response.message});
+      }
+      return res.status(200).json({message: "Email sent.", email: email});
   })    
   
   })
-})
-
-router.use('/signup', async (req,res,next) => {
-
-  const email = req.user.email;
-
-  try {
-
-    const response = await storeVerificationDetails(email, "verification");
-    //console.log(response);
-    if (!response.id){
-      //console.log(response.message);
-      //throw new Error (response);
-      return res.status(500).json({message: response.message});
-    }
-    return res.status(200).json({message: "Email sent.", email: email});
-
-  } catch (error) {
-    console.log(error);
-    return res.status(500).json({message: "There was some kind of server error. You may need to request another verification email."});
-
-  }
 })
 
 router.get('/redirect', async function (req, res, next){
