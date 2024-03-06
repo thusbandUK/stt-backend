@@ -91,6 +91,24 @@ app.use(express.urlencoded({ extended: false }));
 // app.use(cookieParser('keyboard cat'));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const { query, matchedData, validationResult } = require('express-validator');
+/*
+app.use(query('email').isEmail().escape(), function (req, res, next){
+  if (req.body.email){
+    const result = validationResult(req);
+  //const result = validationResult(req);
+  console.log(result);
+  if (!result.isEmpty()){
+    return res.status(500).json({message: "Make sure you have entered a valid email address"});
+  }
+
+  }
+  
+  next();
+
+})
+*/
+
 /*
 app.use(function (req, res, next) {
   console.log('function middleware before app.use session called');

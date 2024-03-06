@@ -11,13 +11,32 @@ const pool = new Pool(dbAccess);
 const { storeVerificationDetails } = require('../miscFunctions/storeVerificationDetails');
 const { updateDatabase, matchToken, prepareBuffers } = require('../miscFunctions/verifyDetails');
 const { deleteAllRecords } = require('../miscFunctions/delete');
+const { query, body, matchedData, validationResult } = require('express-validator');
 
+//validation functions
+
+//password validator requires length 6 to 16, one capital, one lowercase, one number, one special symbol, escapes <, > and '
+const newPasswordValidator = () => body('password').matches(/^(?=.*[0-9])(?=.*[A-Z])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,16}$/).escape().withMessage("Must contain at least one capital, lower case letter, number and special symbol but not <, > or '")
+
+//email validator
+const emailValidator = () => body('email').isEmail().toLowerCase().escape().withMessage("Please enter a valid email address");
+
+//username validator
+const newUsernameValidator = () => body('username').matches(/^[a-zA-Z0-9]{5,20}$/).toLowerCase().escape().withMessage("Usernames can only contain letters and numbers, with no spaces, and must be 5 to 20 characters long. Not case sensitive");
 
 //Passport authentication logic
 
-
+/*
+Note that the below function is configured to receive an email address as a username. Here "username" is retained
+because it is automatically parsed as passed as "username" by the Passport functions in the Node modules
+However, in order that other code reads more intuitively, the front end passes the email as "email" in req.body object
+Then (see below) in the post.login route, req.body.username is defined from req.body.email, all of which facilitates
+middleware that will validate email addresses passed to *any* routes via express-validator
+*/
 passport.use(new LocalStrategy(function verify(username, password, cb) {
   //console.log(username+password);
+  console.log('this is when new LocalStrategy is called');
+  
     
   
     pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
@@ -64,11 +83,21 @@ passport.deserializeUser(function(user, cb) {
 
 
 
-router.post('/login', function(req, res, next) {
+router.post('/login', body('email').isEmail(), function(req, res, next) {
+  const result = validationResult(req);
+  console.log(result);
+  if (!result.isEmpty()){
+    return res.status(500).json({message: "Make sure you have entered a valid email address"});
+  }
+  
+  req.body.username = req.body.email;
+  console.log(req.body);
   
   passport.authenticate('local', {successMessage: true, failureMessage: true}, function(err, user, info) {
    
     if (err) { return next(err) }
+    console.log('user posted below from passport login call')
+    console.log(user);
     if (!user) { 
      passport.authenticate('allFailed') 
      return res.status(500).json(info)
@@ -181,10 +210,18 @@ checks match, deletes token and assoc data from database
 returns instruction to enable input of new password, which will then be harvested via different POST path
 */
 
-router.post('/reset-password-request', async function (req, res, next){
+router.post('/reset-password-request', newPasswordValidator(), async function (req, res, next){
+  const result = validationResult(req);
+    //console.log(result);
+    if (!result.isEmpty()){
+      //console.log(result.errors[0].msg);
+      return res.status(500).json({message: result.errors[0].msg});
+    }
+    const sanitisedData = matchedData(req);
+    const password = sanitisedData.password;
 
   //harvests id and token
-  const { id, token, password } = req.body;
+  const { id, token } = req.body;
 
   //convert params token to buffer
   var buf = Buffer.from(token, 'hex');  
@@ -343,19 +380,28 @@ router.post('/resetPassword', async function(req,res,next){
 })
 
 
+
 /* Sign up user*/
 
-router.post('/signup', function(req, res, next){
+router.post('/signup', newPasswordValidator(), function(req, res, next){
+    const result = validationResult(req);
+    //console.log(result);
+    if (!result.isEmpty()){
+      //console.log(result.errors[0].msg);
+      return res.status(500).json({message: result.errors[0].msg});
+    }
+    const data = matchedData(req);
+    const password = data.password;
  
   
   const { username, email } = req.body
   //console.log('hello and username is...');
   //console.log(req.body);
-  if (!email || !username || !req.body.password){
+  if (!email || !username || !password){
     return res.status(500).json({message: 'You must enter all fields to sign up'});
   }
   var salt = crypto.randomBytes(16);  
-  crypto.pbkdf2(req.body.password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
+  crypto.pbkdf2(password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
     if (err){ 
       //console.log(err);      
       return next(err); 
@@ -456,6 +502,25 @@ router.post('/delete-account', async function (req, res, next){
 
 
 
+
+router.post('/testPassword', newPasswordValidator(), emailValidator(), newUsernameValidator(), function(req, res, next) {
+  console.log('got to start of testPassword')
+  //body('password').matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i")
+  const result = validationResult(req);
+  console.log(result);
+  const data = matchedData(req);
+  console.log(data);
+  if (!result.isEmpty()){
+    console.log(result.errors[0].msg);
+    return res.status(500).json({message: result.array()});
+  }
+  //console.log(req.body.password);
+  //return (data.username.toLowercase());
+  return res.status(200).json({message: data.username+data.password+data.email});
+  //req.check("password", "Password should be combination of one uppercase , one lower case, one special char, one digit and min 8 , max 20 char long").regex("/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/", "i");
+  //req.check("password", "...").matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i");
+
+})
 
 
 
