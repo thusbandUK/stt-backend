@@ -13,6 +13,25 @@ const { updateDatabase, matchToken, prepareBuffers } = require('../miscFunctions
 const { deleteAllRecords } = require('../miscFunctions/delete');
 const { query, body, matchedData, validationResult } = require('express-validator');
 
+/*
+
+
+
+The below functions are configured to send error messages in the following format:
+
+{messages: [
+  {
+    path: [string: username, password, email OR general]
+    msg: [string: individual message]
+  }
+]}
+
+the loginSlice reducer updateErrorConsole then updates the error object in the redux store
+
+This is the format in which error messages are passed by the express-validator dependency at the back end
+
+*/
+
 //validation functions
 
 //password validator requires length 6 to 16, one capital, one lowercase, one number, one special symbol, escapes <, > and '
@@ -379,44 +398,57 @@ router.post('/resetPassword', async function(req,res,next){
   }
 })
 
+//see new signup test route at the bottom
 
+router.post('/signup3', function (req, res, next){
+  const {username, password, email} = req.body;
+  console.log(username+password+email)
+  return res.status(200).json({message: username+password+email})
+})
 
-/* Sign up user*/
+/* Sign up user */
 
-router.post('/signup', newPasswordValidator(), function(req, res, next){
-    const result = validationResult(req);
-    //console.log(result);
-    if (!result.isEmpty()){
-      //console.log(result.errors[0].msg);
-      return res.status(500).json({message: result.errors[0].msg});
-    }
-    const data = matchedData(req);
-    const password = data.password;
- 
+router.post('/signup', newPasswordValidator(), emailValidator(), newUsernameValidator(), function(req, res, next){
   
-  const { username, email } = req.body
-  //console.log('hello and username is...');
-  //console.log(req.body);
-  if (!email || !username || !password){
-    return res.status(500).json({message: 'You must enter all fields to sign up'});
+  //extract any results of validation failures
+  const result = validationResult(req);
+  
+  //returns error(s) specifying reasons for validation failures
+  if (!result.isEmpty()){    
+    return res.status(500).json({messages: result.array()});
   }
+  
+  //extract data which passed the validation test
+  const data = matchedData(req);   
+ 
+  //creates variables for validated data
+  const { username, email, password } = data;
+  
+  //returns error message if any of the fields is empty (probably unnecessary given validation functions)
+  if (!email || !username || !password){
+    return res.status(500).json({messages: [{path: 'general', msg: 'You must enter all fields to sign up'}]});
+  }
+
+  //creates random salt to hash password
   var salt = crypto.randomBytes(16);  
+
+  //hashes input password
   crypto.pbkdf2(password, salt, 310000, 32, 'sha256', function(err, hashedPassword){    
-    if (err){ 
-      //console.log(err);      
+    if (err){       
       return next(err); 
     }
+    //attempts database entry of signup details, including salt and hashed password
     pool.query('INSERT INTO users (username, email, hashed_password, salt) VALUES ($1, $2, $3, $4) RETURNING *', [username, email, hashedPassword, salt], 
     async (error, results) => {
       if (error) {
-        //console.log('if error called');
-
+        
         if (error.constraint === "users_email_key"){
           
-          return res.status(500).json({message: "A user with that email already exists. Please sign up with a different email address"});
+          //Informs user there is already an account with that email address
+          return res.status(500).json({messages: [{path: "general", msg: "A user with that email already exists. Please sign up with a different email address"}]});
         }
         
-        return res.status(500).json({message: "unspecified server error"})
+        return res.status(500).json({messages: [{path: "general", msg: "unspecified server error"}]})
       }
       
       var user = {
@@ -428,13 +460,13 @@ router.post('/signup', newPasswordValidator(), function(req, res, next){
       
       req.user = user;
       
-      //next();
+      //calls imported function which prepares and sends a verification email
       const response = await storeVerificationDetails(email, "verification");
       
-      if (!response.id){
-      
-        return res.status(500).json({message: response.message});
+      if (!response.id){      
+        return res.status(500).json({messages: [{path: "general", msg: response.message}]});
       }
+      //returns success message along with email
       return res.status(200).json({message: "Email sent.", email: email});
   })    
   
@@ -501,9 +533,10 @@ router.post('/delete-account', async function (req, res, next){
 })
 
 
+//the below is a test route created to introduce validation logic
 
 
-router.post('/testPassword', newPasswordValidator(), emailValidator(), newUsernameValidator(), function(req, res, next) {
+router.post('/signup3', newPasswordValidator(), emailValidator(), newUsernameValidator(), function(req, res, next) {
   console.log('got to start of testPassword')
   //body('password').matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i")
   const result = validationResult(req);
