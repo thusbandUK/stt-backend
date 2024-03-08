@@ -37,6 +37,9 @@ This is the format in which error messages are passed by the express-validator d
 //password validator requires length 6 to 16, one capital, one lowercase, one number, one special symbol, escapes <, > and '
 const newPasswordValidator = () => body('password').matches(/^(?=.*[0-9])(?=.*[A-Z])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,16}$/).escape().withMessage("Must contain at least one capital, lower case letter, number and special symbol but not <, > or '")
 
+//existing password validator (same as newPasswordValidator but just returns a simpler message: "Invalid password")
+const existingPasswordValidator = () => body('password').matches(/^(?=.*[0-9])(?=.*[A-Z])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,16}$/).escape().withMessage("Invalid password");
+
 //email validator
 const emailValidator = () => body('email').isEmail().toLowerCase().escape().withMessage("Please enter a valid email address");
 
@@ -102,24 +105,40 @@ passport.deserializeUser(function(user, cb) {
 
 
 
-router.post('/login', body('email').isEmail(), function(req, res, next) {
-  const result = validationResult(req);
-  console.log(result);
-  if (!result.isEmpty()){
-    return res.status(500).json({message: "Make sure you have entered a valid email address"});
-  }
+router.post('/login', emailValidator(), existingPasswordValidator(), function(req, res, next) {
   
-  req.body.username = req.body.email;
-  console.log(req.body);
+  //extracts results for any incoming data which failed validation tests
+  const result = validationResult(req);
+  //console.log(result);
+  //returns individual messages with advice to overcome any validation failures
+  if (!result.isEmpty()){
+    return res.status(500).json({messages: result.array()});
+  }
+
+  //extract data which passed the validation test
+  const data = matchedData(req);   
+ 
+  //creates variables for validated data
+  const { email, password } = data;
+  
+  //this is really important - the Passport logic is configured to receive usernames but the front end is configured
+  //to authenticate users with their email address, so here username is created with the *validated* value of the input email
+  req.body.username = email;
+
+  //likewise req.body.password is overwritten with the validated password, ahead of the below Passport authentication logic
+  req.body.password = password;
+  
   
   passport.authenticate('local', {successMessage: true, failureMessage: true}, function(err, user, info) {
    
     if (err) { return next(err) }
-    console.log('user posted below from passport login call')
-    console.log(user);
+    //console.log('user posted below from passport login call')
+    //console.log(user);
     if (!user) { 
      passport.authenticate('allFailed') 
-     return res.status(500).json(info)
+     //return res.status(500).json(info)
+     //console.log(info);
+     return res.status(500).json({messages: [{path: "general", msg: info.message}]});
    
    }
    
