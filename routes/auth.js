@@ -11,7 +11,7 @@ const pool = new Pool(dbAccess);
 const { storeVerificationDetails } = require('../miscFunctions/storeVerificationDetails');
 const { updateDatabase, matchToken, prepareBuffers } = require('../miscFunctions/verifyDetails');
 const { deleteAllRecords } = require('../miscFunctions/delete');
-const { query, body, matchedData, validationResult } = require('express-validator');
+const { query, param, body, matchedData, validationResult } = require('express-validator');
 
 /*
 
@@ -46,6 +46,12 @@ const emailValidator = () => body('email').isEmail().toLowerCase().escape().with
 //username validator
 const newUsernameValidator = () => body('username').matches(/^[a-zA-Z0-9]{5,20}$/).toLowerCase().escape().withMessage("Usernames can only contain letters and numbers, with no spaces, and must be 5 to 20 characters long. Not case sensitive");
 
+//id validator
+const idValidator = () => param('id').isNumeric().escape().withMessage("corrupted id");
+
+//token validator
+const tokenValidator = () => param('token').isHexadecimal().escape().withMessage("corrupted token");
+
 //Passport authentication logic
 
 /*
@@ -56,11 +62,7 @@ Then (see below) in the post.login route, req.body.username is defined from req.
 middleware that will validate email addresses passed to *any* routes via express-validator
 */
 passport.use(new LocalStrategy(function verify(username, password, cb) {
-  //console.log(username+password);
-  console.log('this is when new LocalStrategy is called');
-  
-    
-  
+   
     pool.query('SELECT * FROM users WHERE email = $1', [ username ], function(error, results) {
       
     if (error) { return cb(error); }
@@ -78,7 +80,6 @@ passport.use(new LocalStrategy(function verify(username, password, cb) {
         
         return cb(null, false, { message: 'Incorrect username or password.' });
       }
-
       
       return cb(null, results.rows[0]);
 
@@ -109,7 +110,7 @@ router.post('/login', emailValidator(), existingPasswordValidator(), function(re
   
   //extracts results for any incoming data which failed validation tests
   const result = validationResult(req);
-  //console.log(result);
+  
   //returns individual messages with advice to overcome any validation failures
   if (!result.isEmpty()){
     return res.status(500).json({messages: result.array()});
@@ -153,61 +154,49 @@ router.post('/login', emailValidator(), existingPasswordValidator(), function(re
   })(req, res, next);
 });
 
-//logout
-/*
-router.get('/logout', function (req, res) {
-  req.logOut();
-  res.status(200).clearCookie('connect.sid', {
-    path: '/',
-    secure: false,
-    httpOnly: false,
-    domain: 'localhost:5000',
-    sameSite: true,
-  });
-  req.session.destroy(function (err) {
-    res.send();
-  });
-});
-*/
-/*
-router.get('/logout', function (req, res) {
-  req.logOut();
-  res.status(200).clearCookie('connect.sid', {
-    path: '/'
-  });
-  req.session.destroy(function (err) {
-    res.redirect('/');
-  });
-});
-
-*/
+//logout route
 
 router.get('/logout', (req, res, next) => {
 
-  //console.log(res.cookie());
-	
-	req.logout(function(err) {  // logout of passport
-    //req.session = null;
-    
+  req.logout(function(err) {  // logout of passport
+        
 		  req.session.destroy(function (err) { // destroy the session
       res.clearCookie('connect.sid', {path: '/'});  // clear the session cookie
 			res.send(); // send to the client
 		});
-    //res.send();
+    
 	});
 });
 
-//Current working verifyEmail route (see verifyEmail2 below)
+//Current working verifyEmail route
 
-router.get('/verifyEmail/:id/:token', async function(req,res,next){
-  //harvest id and token from params
-  const { id, token } = req.params;
+router.get('/verifyEmail/:id/:token', idValidator(), tokenValidator(), async function(req,res,next){
+
+  //extract any results of validation failures
+  const result = validationResult(req);  
+  
+  if (!result.isEmpty()){
+    //logs errors to console, since validation failure may signal malicious intent
+    console.log(result.array());    
+    //returns error, same message no matter whether id or token fails validation
+    return res.status(500).json({messages: [{path: "general", msg: "Corrupted link. Please request new one."}]});
+  }
+  
+  //extract data which passed the validation test
+  const data = matchedData(req);   
+ 
+  //creates variables for validated data
+  const { id, token } = data;  
 
   //convert params token to buffer
-  var buf = Buffer.from(token, 'hex');  
+  var buf = Buffer.from(token, 'hex');
   
+  //calls prepareBuffers function to obtain stored buffer to match from database
   const storedDetails = await prepareBuffers(id, token, "verification");
-  console.log(storedDetails);
+  //passes on error if prepareBuffers returns error
+  if (storedDetails instanceof Error){
+    return res.status(500).json({messages: [{path: "general", msg: "No record of link details found. Please generate new verification link."}]});
+  }
 
   //The code below checks the supplied token in the verification link and checks it against the value stored in the database
       
@@ -221,11 +210,8 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
       const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
       return next(error);              
     }      
-    //adds the userId harvested from the database query to the request
-    //req.userId = user_id;
-    
-    //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
-    //verification
+        
+    //calls updateDatabase to set user active status to true and delete verification data
     const updateDatabaseResult = updateDatabase(storedDetails.user_id, "verification");
     updateDatabaseResult.then(function(data){
       
@@ -233,10 +219,9 @@ router.get('/verifyEmail/:id/:token', async function(req,res,next){
         return res.status(200).json({message: "Verification complete!"})
       } else {
         console.log(data);
-        return res.status(500).json({message: "something went wrong"});
+        return res.status(500).json({messages: [{general: "something went wrong. You may need to reverify."}]});
       }
-    })
-    //next();            
+    })    
 
   }); // end hashing function
 
@@ -300,78 +285,7 @@ router.post('/reset-password-request', newPasswordValidator(), async function (r
 
 })
 
-//verify email logic, see not working verifyEmail2 above
 
-router.get('/verifyEmail2/:id/:token', async function(req,res,next){
-  
-
-  //harvest id and token from params
-  const { id, token } = req.params;
-  
-  //convert params token to buffer
-  var buf = Buffer.from(token, 'hex');  
-  
-  
-  //creates new date object with current time and date
-  const currentDateTime = new Date();
-        
-          pool.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
-      
-          if (error) { 
-            console.log(error);
-            return next(error); 
-          }
-          
-          //Checks to see if verification data exists for id specified in params
-          if (!results.rows[0]) { 
-                  
-            //If no data in verification table, error message returned
-            return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
-            
-          }
-          
-          //harvests the user_id and the date and time verification details were stored
-          const { date_time_stored, user_id } = results.rows[0]
-          
-          //checks to see if token has expired
-          if (!dateCompare(date_time_stored, currentDateTime)){
-            //if token is too old, error message is sent - timing for age of token can be set in imported function
-            
-            return res.status(500).json({message: 'Token expired, please request a new verification link'});
-          }
-
-          //The code below checks the supplied token in the verification link and checks it against the value stored in the database
-      
-          crypto.pbkdf2(buf, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
-            
-            if (err) { 
-              return next(err); }
-            if (!crypto.timingSafeEqual(results.rows[0].hashed_string, hashedBuffer)) {
-              //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
-              //and is logged as such by the middleware
-              const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
-              return next(error);              
-            }      
-            //adds the userId harvested from the database query to the request
-            //req.userId = user_id;
-            
-            //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
-            //verification
-            const verificationResult = verifyDetails(user_id, buf);
-            verificationResult.then(function(data){
-              
-              if (data === "actions completed"){
-                return res.status(200).json({message: "Verification complete!"})
-              } else {
-                console.log(data);
-                return res.status(500).json({message: "something went wrong"});
-              }
-            })
-            //next();            
-      
-          }); // end hashing function
-        }); //end pool request       
-})
 
 
 router.post('/resendVerificationEmail', async function (req, res, next) {
@@ -554,8 +468,9 @@ router.post('/delete-account', async function (req, res, next){
 
 //the below is a test route created to introduce validation logic
 
+//idValidator(), tokenValidator(),
 
-router.post('/signup3', newPasswordValidator(), emailValidator(), newUsernameValidator(), function(req, res, next) {
+router.get('/verifyEmail2/:id/:token', idValidator(), tokenValidator(),  function(req, res, next) {
   console.log('got to start of testPassword')
   //body('password').matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i")
   const result = validationResult(req);
@@ -568,7 +483,7 @@ router.post('/signup3', newPasswordValidator(), emailValidator(), newUsernameVal
   }
   //console.log(req.body.password);
   //return (data.username.toLowercase());
-  return res.status(200).json({message: data.username+data.password+data.email});
+  return res.status(200).json({message: data.id+data.token});
   //req.check("password", "Password should be combination of one uppercase , one lower case, one special char, one digit and min 8 , max 20 char long").regex("/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/", "i");
   //req.check("password", "...").matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i");
 

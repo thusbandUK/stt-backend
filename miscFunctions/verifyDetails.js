@@ -194,11 +194,13 @@ async function prepareBuffers(id, token, mode){
 
     //Checks to see if verification data exists for id specified in params
     if (storedTimestampUserId.rowCount === 0){ 
+      console.log('row count was equal to zero route triggered');
                   
       //If no data in verification table, error message returned
       const error = new Error("There was a problem verifying your email. Please generate a new link");
       return error;      
     }
+    console.log('row count not equal to zero route triggered');
 
     //harvests the user_id and the date and time verification details were stored
     const { date_time_stored } = storedTimestampUserId.rows[0]

@@ -243,4 +243,77 @@ router.use('/verifyEmail/:id/:token', async function(req,res,next){
   }
 })
 
+//verify email logic, see not working verifyEmail2 above
+
+router.get('/verifyEmail2/:id/:token', async function(req,res,next){
+  
+
+  //harvest id and token from params
+  const { id, token } = req.params;
+  
+  //convert params token to buffer
+  var buf = Buffer.from(token, 'hex');  
+  
+  
+  //creates new date object with current time and date
+  const currentDateTime = new Date();
+        
+          pool.query('SELECT * FROM verification WHERE id = $1', [ id ], function(error, results) {
+      
+          if (error) { 
+            console.log(error);
+            return next(error); 
+          }
+          
+          //Checks to see if verification data exists for id specified in params
+          if (!results.rows[0]) { 
+                  
+            //If no data in verification table, error message returned
+            return res.status(500).json({message: 'There was a problem verifying your email. Please generate a new link'});
+            
+          }
+          
+          //harvests the user_id and the date and time verification details were stored
+          const { date_time_stored, user_id } = results.rows[0]
+          
+          //checks to see if token has expired
+          if (!dateCompare(date_time_stored, currentDateTime)){
+            //if token is too old, error message is sent - timing for age of token can be set in imported function
+            
+            return res.status(500).json({message: 'Token expired, please request a new verification link'});
+          }
+
+          //The code below checks the supplied token in the verification link and checks it against the value stored in the database
+      
+          crypto.pbkdf2(buf, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedBuffer) {
+            
+            if (err) { 
+              return next(err); }
+            if (!crypto.timingSafeEqual(results.rows[0].hashed_string, hashedBuffer)) {
+              //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
+              //and is logged as such by the middleware
+              const error = new Error("Wrong link. Try signing in using your existing details or else sign up again");
+              return next(error);              
+            }      
+            //adds the userId harvested from the database query to the request
+            //req.userId = user_id;
+            
+            //calls verificationResult which sets the user's active status to true in users and deletes the verification data from
+            //verification
+            const verificationResult = verifyDetails(user_id, buf);
+            verificationResult.then(function(data){
+              
+              if (data === "actions completed"){
+                return res.status(200).json({message: "Verification complete!"})
+              } else {
+                console.log(data);
+                return res.status(500).json({message: "something went wrong"});
+              }
+            })
+            //next();            
+      
+          }); // end hashing function
+        }); //end pool request       
+})
+
 */
