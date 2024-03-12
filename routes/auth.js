@@ -233,24 +233,39 @@ checks match, deletes token and assoc data from database
 returns instruction to enable input of new password, which will then be harvested via different POST path
 */
 
-router.post('/reset-password-request', newPasswordValidator(), async function (req, res, next){
+router.post('/reset-password-request/:id/:token', idValidator(), tokenValidator(), newPasswordValidator(), async function (req, res, next){
   const result = validationResult(req);
     //console.log(result);
     if (!result.isEmpty()){
-      //console.log(result.errors[0].msg);
-      return res.status(500).json({message: result.errors[0].msg});
+      console.log(result);
+      //returns corrupted link message if id or token fail validation checks
+      if (result.errors[0].path === "id" || result.errors[0].path === "token"){
+        return res.status(500).json({messages: [{path: "general", msg: "Corrupted link. Please wait to be redirected to request a new one."}]});
+      }      
     }
     const sanitisedData = matchedData(req);
-    const password = sanitisedData.password;
+    //const password = sanitisedData.password;
 
   //harvests id and token
-  const { id, token } = req.body;
+  const { id, token, password } = sanitisedData;
 
   //convert params token to buffer
   var buf = Buffer.from(token, 'hex');  
 
   //returns details stored with the supplied id
   const storedDetails = await prepareBuffers(id, token, "reset");
+  //passes on error if prepareBuffers returns error
+  if (storedDetails instanceof Error){
+    return res.status(500).json({messages: [{path: "general", msg: "No record of link details found. Please generate new verification link."}]});
+  }
+
+  //returns error if password fails validation
+  if (!result.isEmpty()){    
+    if (result.errors[0].path === "password"){
+      //returns criteria creating secure password
+      return res.status(500).json({messages: result.array()});
+    }
+  }
 
   //The code below checks the supplied token in the reset password link and checks it against the value stored in the database
       
@@ -261,8 +276,9 @@ router.post('/reset-password-request', newPasswordValidator(), async function (r
     if (!crypto.timingSafeEqual(storedDetails.hashed_string, hashedBuffer)) {
       //Below logs error via error handling middleware. A non-matching token would amount to suspicious activity
       //and is logged as such by the middleware
-      const error = new Error("Wrong link. Try resetting your password again");
-      return next(error);              
+      //const error = new Error("Wrong link. Try resetting your password again");
+      //return next(error);
+      return res.status(500).json({messages: [{path: "general", msg: "Wrong link. Try signing in using your existing details or else sign up again."}]});
     }      
     //adds the userId harvested from the database query to the request
     //req.userId = user_id;

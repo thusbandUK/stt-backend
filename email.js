@@ -93,7 +93,7 @@ async function verificationEmail(email, token, verificationId) {
     function createEmailOptions(email, token, verificationId, pathType) {
       
       const url = process.env.DEV_ORIGIN;
-      const path = `${url}/${pathType}-landing?id=${verificationId}&token=${token}`; // plain text body
+      const path = `${url}/login/${pathType}-landing?id=${verificationId}&token=${token}`; // plain text body
       const details = messageDetails(pathType);
       const mailOptionsVerification = {
         from: process.env.EMAIL_ADDRESS, // sender address
@@ -102,10 +102,7 @@ async function verificationEmail(email, token, verificationId) {
         html: `<p>Click the <a href=${path}>link</a> to ${details.messageFragment}</p>`, // plain text body
       }
       
-      return mailOptionsVerification;
-
-
-      
+      return mailOptionsVerification;      
            
       }
 

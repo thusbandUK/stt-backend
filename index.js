@@ -172,7 +172,7 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   if (err.message.includes("Wrong link.")){
     console.log('SUSPICIOUS BEHAVIOUR ALERT! There was a verification attempt with a non-matching token.')
-    return res.status(500).json({message: "Wrong link. Try signing in using your existing details or else sign up again."});
+    return res.status(500).json({messages: [{path: "general", msg: "Wrong link. Try signing in using your existing details or else sign up again."}]});
   }
   //log error
   console.error(err.stack)
