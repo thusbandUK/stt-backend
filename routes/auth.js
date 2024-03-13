@@ -324,7 +324,7 @@ router.post('/resendVerificationEmail', emailValidator(), async function (req, r
     
     if (!response.id){
       //returns an error if there are no matching details stored
-      return res.status(500).json({messages: [{path: "general", msg: response.message}]});      
+      return res.status(500).json({messages: [{path: "general", msg: response.message}]});
     }
     return res.status(200).json({message: "Email sent."});
 
@@ -338,22 +338,34 @@ router.post('/resendVerificationEmail', emailValidator(), async function (req, r
 
 //reset password route
 
-router.post('/resetPassword', async function(req,res,next){
-  console.log('reset password route called');
-  const email = req.body.email;
+router.post('/resetPassword', emailValidator(), async function(req,res,next){
+  const result = validationResult(req);
+  //handles any validation failure errors
+  if (!result.isEmpty()){      
+    //returns error message calling for valid email address
+    return res.status(500).json({messages: result.array()});            
+  }
+  //harvests sanitised data
+  const sanitisedData = matchedData(req);
+    
+  //creates sanitised email variable
+  const { email } = sanitisedData;  
+  //const email = req.body.email;
   
   try {
     const response = await storeVerificationDetails(email, "reset");
-    console.log(response);
+    //console.log(response);
     if (!response.id){
-      
-      return res.status(500).json({message: response.message});
+      //returns an error if there are no matching details stored
+      return res.status(500).json({messages: [{path: "general", msg: response.message}]});      
     }
     return res.status(200).json({message: "Email sent."});
 
   } catch (error){
-    console.log(error);
-    return res.status(500).json({message: error});
+    //logs error to record unanticipated errors
+    console.log(error.message);
+    //returns generic error message
+    return res.status(500).json({messages: [{path: "general", msg: "Internal server error."}]});
   }
 })
 
