@@ -228,7 +228,8 @@ router.get('/verifyEmail/:id/:token', idValidator(), tokenValidator(), async fun
 })
 
 /*
-supplied in body: id and string token
+supplied in params: id and string token
+supplied in body: password
 checks match, deletes token and assoc data from database
 returns instruction to enable input of new password, which will then be harvested via different POST path
 */
@@ -262,7 +263,7 @@ router.post('/reset-password-request/:id/:token', idValidator(), tokenValidator(
   //returns error if password fails validation
   if (!result.isEmpty()){    
     if (result.errors[0].path === "password"){
-      //returns criteria creating secure password
+      //returns criteria for creating secure password
       return res.status(500).json({messages: result.array()});
     }
   }
@@ -304,26 +305,35 @@ router.post('/reset-password-request/:id/:token', idValidator(), tokenValidator(
 
 
 
-router.post('/resendVerificationEmail', async function (req, res, next) {
-  //harvests email address from request body
-  const email = req.body.email;
+router.post('/resendVerificationEmail', emailValidator(), async function (req, res, next) {
+  const result = validationResult(req);
+  //handles any validation failure errors
+  if (!result.isEmpty()){      
+    //returns error message calling for valid email address
+    return res.status(500).json({messages: result.array()});            
+  }
+  //harvests sanitised data
+  const sanitisedData = matchedData(req);
+    
+  //creates sanitised email variable
+  const { email } = sanitisedData;  
 
   try {
 
     const response = await storeVerificationDetails(email, "verification");
     
     if (!response.id){
-      
-      return res.status(500).json({message: response.message});
+      //returns an error if there are no matching details stored
+      return res.status(500).json({messages: [{path: "general", msg: response.message}]});      
     }
     return res.status(200).json({message: "Email sent."});
 
   } catch (error) {
-    console.log(error);
-    return res.status(500).json(error);
-
+    //logs error to record unanticipated errors
+    console.log(error.message);
+    //returns generic error message
+    return res.status(500).json({messages: [{path: "general", msg: "Internal server error."}]});
   }
-
 })
 
 //reset password route
