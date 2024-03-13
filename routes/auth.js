@@ -448,51 +448,56 @@ router.get('/redirect', async function (req, res, next){
   return res.status(200).json({message: "Your account has successfully been deleted"});
 })
 
-//temporarily changed to 2 for experiment above
+//delete account route, receives a password via req.body
 
-router.post('/delete-account', async function (req, res, next){
+router.post('/delete-account', existingPasswordValidator(), async function (req, res, next){
+  //returns error message if the user is not logged in (has no session-related user object) 
   if (!req.user){
-    return res.redirect('/redirect');
+    return res.status(500).json({messages: [{path: "general", msg: "This content requires you to be logged in. Please wait to be redirected."}]})
   }
-  const { password } = req.body;
+  const result = validationResult(req);
+  //handles any validation failure errors
+  if (!result.isEmpty()){      
+    //returns error message calling for valid email address
+    return res.status(500).json({messages: result.array()});            
+  }
+  //harvests sanitised data
+  const sanitisedData = matchedData(req);
+    
+  //creates sanitised password variable
+  const { password } = sanitisedData;
   
   const { id } = req.user;
-  console.log(id);
-  //return res.status(200).json({message: id});
-
-  const deleteRequest = 'DELETE FROM users WHERE id = $1 RETURNING *';
-  
-  const queryValues = [ id ];
-  const client = await pool.connect();
 
   pool.query('SELECT * FROM users WHERE id = $1', [ id ], function(error, results) {
       
     if (error) { return cb(error); }
-    if (!results.rows[0]) { 
-
-      return res.status(500).json({ message: 'Incorrect username or password.' }); }
-
-    crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {
-      
+    if (!results.rows[0]) {
+      //returns error message if no user found with matching data
+      return res.status(500).json({ messages: [{path: "general", msg: 'Incorrect username or password.'}]});
+    }
+    crypto.pbkdf2(password, results.rows[0].salt, 310000, 32, 'sha256', function(err, hashedPassword) {      
       if (err) { return next(err); }
       if (!crypto.timingSafeEqual(results.rows[0].hashed_password, hashedPassword)) {
-        
-        return res.status(500).json({ message: 'Incorrect username or password.' });
+        //if password incorrect, returns error message accordingly        
+        return res.status(500).json({ messages: [{path: "general", msg: 'Incorrect username or password.'}]});
       }
-
+      //if the password matches, deleteAllRecords function is called
       const databaseResponse = deleteAllRecords(req.user.id, req.session.id);
       databaseResponse.then((response) => {
         if (response){
-          req.logout(function(err) {  // logout of passport
+          return req.logout(function(err) {  // logout of passport
             //req.session = null;
             
               req.session.destroy(function (err) { // destroy the session
               res.clearCookie('connect.sid', {path: '/'});  // clear the session cookie
-              res.send(); // send to the client
+              console.log('it got to just before the return statement.');
+              return res.status(200).json({message: "Account deleted!"}); // send to the client
             });
           //return res.redirect("/account-deleted");
         })
       } else {
+        console.log('went via else instead');
         return next(new Error("There was a problem deleting the records"));
       }
     })
@@ -508,7 +513,8 @@ router.post('/delete-account', async function (req, res, next){
 
 //idValidator(), tokenValidator(),
 
-router.get('/verifyEmail2/:id/:token', idValidator(), tokenValidator(),  function(req, res, next) {
+router.post('/delete-account2', function(req, res, next) {
+  return res.status(200).json({message: "Response okay"});
   console.log('got to start of testPassword')
   //body('password').matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i")
   const result = validationResult(req);
@@ -521,7 +527,7 @@ router.get('/verifyEmail2/:id/:token', idValidator(), tokenValidator(),  functio
   }
   //console.log(req.body.password);
   //return (data.username.toLowercase());
-  return res.status(200).json({message: data.id+data.token});
+  //return res.status(200).json({message: data.id+data.token});
   //req.check("password", "Password should be combination of one uppercase , one lower case, one special char, one digit and min 8 , max 20 char long").regex("/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/", "i");
   //req.check("password", "...").matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z]{8,}$/, "i");
 
